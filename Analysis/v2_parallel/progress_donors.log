@@ -1,0 +1,19 @@
+Starting script at 1733844908 
+- Loaded Seurat objects - 
+- Loaded priors - 
+2024-12-10 16:36:44 - Starting: cd4_positive_t_cell - Donor: TSP7 
+2024-12-10 16:36:44 - Starting: cd8_positive_t_cell - Donor: TSP8 
+2024-12-10 16:36:44 - Starting: cd4_positive_t_cell - Donor: TSP10 
+2024-12-10 16:36:44 - Starting: cd4_positive_t_cell - Donor: TSP8 
+2024-12-10 16:36:44 - Starting: cd8_positive_t_cell - Donor: TSP7 
+2024-12-10 16:36:44 - Starting: cd4_positive_t_cell - Donor: TSP1 
+2024-12-10 16:36:44 - Starting: cd8_positive_t_cell - Donor: TSP14 
+2024-12-10 16:36:44 - Starting: cd8_positive_t_cell - Donor: TSP1 
+2024-12-10 16:36:44 - Starting: monocyte - Donor: TSP14 
+2024-12-10 16:36:44 - Starting: cd8_positive_t_cell - Donor: TSP10 
+2024-12-10 16:36:44 - Starting: monocyte - Donor: TSP8 
+2024-12-10 16:36:44 - Starting: monocyte - Donor: TSP7 
+2024-12-10 16:36:44 - Starting: monocyte - Donor: TSP10 
+2024-12-10 16:36:44 - Starting: cd4_positive_t_cell - Donor: TSP14 
+2024-12-10 16:36:44 - Starting: cd8_positive_t_cell - Donor: TSP2 
+2024-12-10 16:36:44 - Starting: cd4_positive_t_cell - Donor: TSP2 

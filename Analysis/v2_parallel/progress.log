@@ -1,0 +1,13 @@
+Starting script at 1733931118 
+- Loaded Seurat objects- 
+- Loaded priors - 
+2024-12-11 16:32:44 - Starting: monocyte 
+2024-12-11 16:32:44 - Starting: cd4_positive_t_cell 
+2024-12-11 16:32:44 - Starting: cd8_positive_t_cell 
+2024-12-11 18:37:46 - Finished: cd4_positive_t_cell 
+2024-12-11 18:38:05 - Starting: type_ii_pneumocyte 
+2024-12-11 18:44:24 - Finished: cd8_positive_t_cell 
+2024-12-11 18:57:58 - Finished: monocyte 
+2024-12-11 21:16:43 - Finished: type_ii_pneumocyte 
+Saved SCORPION output - Rdata/lungScorpionOutput.Rdata 
+All tasks completed at 1733948229 

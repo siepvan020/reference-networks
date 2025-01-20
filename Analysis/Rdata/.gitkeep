@@ -1,0 +1,14 @@
+Placeholder file for .Rdata files, which were too big to commit to this repository
+Containing:
+- blood_object.rds
+- lungScorpionOutput.Rdata
+- temp_cd8_positive_t_cell_bloodScorpionOutput.Rdata
+- temp_monocyte_lungScorpionOutput.Rdata
+- bloodScorpionOutput.Rdata
+- temp_cd4_positive_t_cell_bloodScorpionOutput.Rdata
+- temp_cd8_positive_t_cell_lungScorpionOutput.Rdata
+- temp_platelet_bloodScorpionOutput.Rdata
+- lung_object.rds
+- temp_cd4_positive_t_cell_lungScorpionOutput.Rdata
+- temp_monocyte_bloodScorpionOutput.Rdata
+- temp_type_ii_pneumocyte_lungScorpionOutput.Rdata

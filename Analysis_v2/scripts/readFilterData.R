@@ -2,8 +2,10 @@
 
 # Load required packages
 if (!requireNamespace("Seurat", quietly = TRUE)) install.packages("Seurat")
+if (!requireNamespace("harmony", quietly = TRUE)) install.packages("harmony")
 
 library(Seurat)
+library(harmony)
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data/rds")
@@ -43,13 +45,37 @@ blood_to_keep <- rownames(blood_object@meta.data[blood_object@meta.data$cell_typ
 
 # Filter the Seurat object based on selected cell barcodes
 filtered_blood <- blood_object[, blood_to_keep]
+Idents(filtered_blood) <- filtered_blood@meta.data$cell_type
 
 table(filtered_blood@meta.data$cell_type)
 
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/celltype_filtering")
 
-saveRDS(filtered_blood, file = "blood_celltypes.rds")
-print("Saved filtered blood cell types")
+
+blood_object@reductions <- list()
+
+filtered_blood <- FindVariableFeatures(filtered_blood)
+filtered_blood <- ScaleData(filtered_blood)
+filtered_blood <- RunPCA(filtered_blood, verbose = FALSE)
+
+filtered_blood <- RunUMAP(filtered_blood, dims = 1:30)
+DimPlot(filtered_blood, reduction = "umap", group.by = "cell_type")
+DimPlot(filtered_blood, reduction = "umap", group.by = "donor_id")
+
+batch_blood_obj <- harmony::RunHarmony(filtered_blood, group.by.vars = "donor_id")
+DimPlot(batch_blood_obj, reduction = "harmony", group.by = "cell_type")
+DimPlot(batch_blood_obj, reduction = "harmony", group.by = "donor_id")
+
+
+
+
+setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
+
+saveRDS(batch_blood, file = "blood_preprocessed.rds")
+print("Saved filtered, batch corrected blood object")
+
+
+
+
 
 # ------------------------------ Lung ------------------------------
 
@@ -91,10 +117,13 @@ lung_to_keep <- rownames(lung_object@meta.data[lung_object@meta.data$cell_type %
 
 # Filter the Seurat object based on selected cell barcodes
 filtered_lung <- lung_object[, lung_to_keep]
+Idents(filtered_lung) <- filtered_lung@meta.data$cell_type
 
 table(filtered_lung@meta.data$cell_type)
 
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/celltype_filtering")
+# batch_lung <- harmony::RunHarmony(filtered_lung, group.by.vars = "donor_id")
 
-saveRDS(filtered_lung, file = "lung_celltypes.rds")
-print("Saved filtered lung cell types")
+setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
+
+saveRDS(batch_lung, file = "lung_preprocessed.rds")
+print("Saved filtered, batch corrected lung object")

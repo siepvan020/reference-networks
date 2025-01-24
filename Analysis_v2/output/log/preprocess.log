@@ -1,0 +1,6 @@
+Starting script at 2025-01-24 11:19:00 
+Loaded data
+Filtered data
+Run ComBatSeq on blood 2025-01-24 11:20:00 
+Run ComBatSeq on lung 2025-01-24 12:08:14 
+Convert objects back to Seurat

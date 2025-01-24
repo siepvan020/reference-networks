@@ -1,11 +1,29 @@
 #!/usr/bin/env Rscript
 
+
+
 # Load required packages
+if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
 if (!requireNamespace("Seurat", quietly = TRUE)) install.packages("Seurat")
-# if (!requireNamespace("harmony", quietly = TRUE)) install.packages("harmony")
+
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+if (!requireNamespace("singleCellTK", quietly = TRUE)) BiocManager::install("singleCellTK")
+
+# if (!requireNamespace("sva", quietly = TRUE)) devtools::install_github("zhangyuqing/sva-devel")
+if (!requireNamespace("Matrix", quietly = TRUE)) install.packages("Matrix")
+if (!requireNamespace("ggplot2", quietly = TRUE)) install.packages("ggplot2")
 
 library(Seurat)
+# library(sva)
+library(Matrix)
+library(singleCellTK)
+library(ggplot2)
 # library(harmony)
+
+progress_file <- "/div/pythagoras/u1/siepv/siep/Analysis_v2/output/log/preprocess.log"
+
+cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
+
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data/rds")
@@ -14,7 +32,7 @@ setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data/rds")
 #### 1. Load data ####
 blood_object <- readRDS("TS_v2_Blood.rds")
 lung_object <- readRDS("TS_v2_Lung.rds")
-print("Loaded data")
+cat("Loaded data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 2. Correct cell type annotations ####
@@ -64,17 +82,50 @@ lung_object <- lung_object[, cells_to_keep_lung]
 Idents(blood_object) <- blood_object@meta.data$cell_type
 Idents(lung_object) <- lung_object@meta.data$cell_type
 
-print("Filtered data")
+cat("Filtered data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 #### 4. Batch correction ####
 
+sce_blood <- Seurat::as.SingleCellExperiment(blood_object)
+sce_lung <- Seurat::as.SingleCellExperiment(lung_object)
 
+cat("Run ComBatSeq on blood", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+sce_blood <- singleCellTK::runComBatSeq(sce_blood, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
+
+cat("Run ComBatSeq on lung", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+sce_lung <- singleCellTK::runComBatSeq(sce_lung, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
+
+cat("Convert objects back to Seurat at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+batch_blood_obj <- as.Seurat(sce_blood)
+batch_lung_obj <- as.Seurat(sce_lung)
+
+# Ensure the corrected matrix is assigned to RNA counts in Seurat
+if ("ComBatSeq" %in% assayNames(sce_blood)) {
+    batch_blood_obj@assays$RNA@counts <- assay(sce_blood, "ComBatSeq")
+} else {
+    cat("Warning: ComBatSeq assay missing in SCE blood object!\n", file = progress_file, append = TRUE)
+}
+
+if ("ComBatSeq" %in% assayNames(sce_lung)) {
+    batch_lung_obj@assays$RNA@counts <- assay(sce_lung, "ComBatSeq")
+} else {
+    cat("Warning: ComBatSeq assay missing in SCE lung object!\n", file = progress_file, append = TRUE)
+}
 
 
 #### 5. Save preprocessed data ####
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
 
+cat("Save SCE objects at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+saveRDS(sce_blood, file = "blood_sce.rds")
+saveRDS(sce_lung, file = "lung_sce.rds")
+
+cat("Save preprocessed data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 saveRDS(blood_object, file = "blood_preprocessed.rds")
 saveRDS(lung_object, file = "lung_preprocessed.rds")
 
-print("Saved filtered, batch corrected objects")
+cat("Save batch corrected data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+saveRDS(batch_blood_obj, file = "blood_preprocessed_batch.rds")
+saveRDS(batch_lung_obj, file = "lung_preprocessed_batch.rds")
+
+cat("Saved filtered, batch corrected objects at", format(Sys.time()), "\n", file = progress_file, append = TRUE)

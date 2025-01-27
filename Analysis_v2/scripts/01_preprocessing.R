@@ -1,28 +1,24 @@
 #!/usr/bin/env Rscript
 
 
+progress_file <- "/div/pythagoras/u1/siepv/siep/Analysis_v2/output/log/preprocess.log"
+cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
 
 # Load required packages
 if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
 if (!requireNamespace("Seurat", quietly = TRUE)) install.packages("Seurat")
-
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 if (!requireNamespace("singleCellTK", quietly = TRUE)) BiocManager::install("singleCellTK")
-
-# if (!requireNamespace("sva", quietly = TRUE)) devtools::install_github("zhangyuqing/sva-devel")
 if (!requireNamespace("Matrix", quietly = TRUE)) install.packages("Matrix")
 if (!requireNamespace("ggplot2", quietly = TRUE)) install.packages("ggplot2")
 
 library(Seurat)
-# library(sva)
 library(Matrix)
 library(singleCellTK)
 library(ggplot2)
-# library(harmony)
 
-progress_file <- "/div/pythagoras/u1/siepv/siep/Analysis_v2/output/log/preprocess.log"
+cat("Loaded required packages at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
-cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
 
 
 # Set working directory
@@ -81,8 +77,13 @@ blood_object <- blood_object[, cells_to_keep_blood]
 lung_object <- lung_object[, cells_to_keep_lung]
 Idents(blood_object) <- blood_object@meta.data$cell_type
 Idents(lung_object) <- lung_object@meta.data$cell_type
-
 cat("Filtered data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+
+setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
+saveRDS(blood_object, file = "blood_preprocessed.rds")
+saveRDS(lung_object, file = "lung_preprocessed.rds")
+cat("Saved filtered data at", format(Sys.time()), "\n\n\n", file = progress_file, append = TRUE)
+
 
 #### 4. Batch correction ####
 
@@ -92,12 +93,24 @@ sce_lung <- Seurat::as.SingleCellExperiment(lung_object)
 cat("Run ComBatSeq on blood", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 sce_blood <- singleCellTK::runComBatSeq(sce_blood, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
 
-cat("Run ComBatSeq on lung", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+cat("Run ComBatSeq on lung", format(Sys.time()), "\n\n", file = progress_file, append = TRUE)
 sce_lung <- singleCellTK::runComBatSeq(sce_lung, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
+
+cat("Assays in SCE Blood:", assayNames(sce_blood), "\n", file = progress_file, append = TRUE)
+cat("Assays in SCE Lung:", assayNames(sce_lung), "\n\n", file = progress_file, append = TRUE)
+
+cat("Save SCE objects at", format(Sys.time()), "\n\n\n", file = progress_file, append = TRUE)
+saveRDS(sce_blood, file = "blood_sce.rds")
+saveRDS(sce_lung, file = "lung_sce.rds")
 
 cat("Convert objects back to Seurat at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 batch_blood_obj <- as.Seurat(sce_blood)
 batch_lung_obj <- as.Seurat(sce_lung)
+
+cat("Save batch corrected seurat object at", format(Sys.time()), "\n\n\n", file = progress_file, append = TRUE)
+saveRDS(batch_blood_obj, file = "blood_preprocessed_batch.rds")
+saveRDS(batch_lung_obj, file = "lung_preprocessed_batch.rds")
+
 
 # Ensure the corrected matrix is assigned to RNA counts in Seurat
 if ("ComBatSeq" %in% assayNames(sce_blood)) {
@@ -116,15 +129,12 @@ if ("ComBatSeq" %in% assayNames(sce_lung)) {
 #### 5. Save preprocessed data ####
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
 
-cat("Save SCE objects at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-saveRDS(sce_blood, file = "blood_sce.rds")
-saveRDS(sce_lung, file = "lung_sce.rds")
 
-cat("Save preprocessed data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-saveRDS(blood_object, file = "blood_preprocessed.rds")
-saveRDS(lung_object, file = "lung_preprocessed.rds")
+# cat("Save preprocessed data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+# saveRDS(blood_object, file = "blood_preprocessed.rds")
+# saveRDS(lung_object, file = "lung_preprocessed.rds")
 
-cat("Save batch corrected data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+cat("Overwrite batch corrected seurat object at", format(Sys.time()), "\n\n", file = progress_file, append = TRUE)
 saveRDS(batch_blood_obj, file = "blood_preprocessed_batch.rds")
 saveRDS(batch_lung_obj, file = "lung_preprocessed_batch.rds")
 

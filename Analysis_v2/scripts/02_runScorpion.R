@@ -25,11 +25,18 @@ setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 #### 2. Load data ####
 
-# Load Seurat objects
+# Load Seurat objects                           ## write function for this?
 blood_object <- readRDS("output/preprocessing/blood_preprocessed_batch.rds")
 Idents(blood_object) <- "cell_type"
 lung_object <- readRDS("output/preprocessing/lung_preprocessed_batch.rds")
 Idents(lung_object) <- "cell_type"
+fat_object <- readRDS("output/preprocessing/fat_preprocessed_batch.rds")
+Idents(fat_object) <- "cell_type"
+kidney_object <- readRDS("output/preprocessing/kidney_preprocessed.rds")
+Idents(kidney_object) <- "cell_type"
+liver_object <- readRDS("output/preprocessing/liver_preprocessed_batch.rds")
+Idents(liver_object) <- "cell_type"
+
 cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Read priors
@@ -110,8 +117,17 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
 # Run SCORPION for blood
 run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput.Rdata")
 
-# Run SCORPION for lung
+# # Run SCORPION for lung
 run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput.Rdata")
+
+# Run SCORPION for fat
+run_scorpion("fat", fat_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "adipose_stem_cell"), "output/networks/final/fatScorpionOutput.Rdata")
+
+# Run SCORPION for kidney
+run_scorpion("kidney", kidney_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "kidney_epithelial_cell"), "output/networks/final/kidneyScorpionOutput.Rdata")
+
+# Run SCORPION for liver
+run_scorpion("liver", liver_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "hepatocyte"), "output/networks/final/liverScorpionOutput.Rdata")
 
 # Stop parallel processing
 stopCluster(cl)

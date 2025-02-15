@@ -50,22 +50,35 @@ Idents(filtered_blood) <- filtered_blood@meta.data$cell_type
 table(filtered_blood@meta.data$cell_type)
 
 
+setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
+lung_filter_obj <- readRDS("lung_preprocessed.rds")
+lung_batch_obj <- readRDS("lung_preprocessed_batch.rds")
 
-blood_object@reductions <- list()
+lung_filter_obj@reductions <- list()
+lung_batch_obj@reductions <- list()
 
-filtered_blood <- FindVariableFeatures(filtered_blood)
-filtered_blood <- ScaleData(filtered_blood)
-filtered_blood <- RunPCA(filtered_blood, verbose = FALSE)
+lung_filter_obj <- FindVariableFeatures(lung_filter_obj)
+lung_filter_obj <- ScaleData(lung_filter_obj)
+lung_filter_obj <- RunPCA(lung_filter_obj, verbose = FALSE)
+lung_filter_obj <- RunUMAP(lung_filter_obj, dims = 1:30)
 
-filtered_blood <- RunUMAP(filtered_blood, dims = 1:30)
-DimPlot(filtered_blood, reduction = "umap", group.by = "cell_type")
-DimPlot(filtered_blood, reduction = "umap", group.by = "donor_id")
+lung_batch_obj <- FindVariableFeatures(lung_batch_obj)
+lung_batch_obj <- ScaleData(lung_batch_obj)
+lung_batch_obj <- RunPCA(lung_batch_obj, verbose = FALSE)
+lung_batch_obj <- RunUMAP(lung_batch_obj, dims = 1:30)
+
+p1 <- DimPlot(lung_filter_obj, reduction = "umap", group.by = "cell_type")
+p2 <- DimPlot(lung_batch_obj, reduction = "umap", group.by = "cell_type")
+p1 + p2
+
+p3 <- DimPlot(lung_filter_obj, reduction = "umap", group.by = "donor_id")
+p4 <- DimPlot(lung_batch_obj, reduction = "umap", group.by = "donor_id")
+p3 + p4
+
 
 batch_blood_obj <- harmony::RunHarmony(filtered_blood, group.by.vars = "donor_id")
 DimPlot(batch_blood_obj, reduction = "harmony", group.by = "cell_type")
 DimPlot(batch_blood_obj, reduction = "harmony", group.by = "donor_id")
-
-
 
 
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")

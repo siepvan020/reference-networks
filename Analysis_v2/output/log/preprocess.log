@@ -1,23 +1,20 @@
-Starting script at 2025-01-24 14:25:49 
-Loaded required packages at 2025-01-24 14:26:00 
-Loaded data at 2025-01-24 14:26:46 
-Filtered data at 2025-01-24 14:26:56 
-Saved filtered data at 2025-01-24 14:32:08 
+Starting script at 2025-02-12 20:41:08 
+Loaded required packages at 2025-02-12 20:41:16 
+Loaded data at 2025-02-12 20:41:49 
+Filtered data at 2025-02-12 20:41:52 
+Saved filtered data at 2025-02-12 20:42:48 
 
 
-Run ComBatSeq on blood 2025-01-24 14:32:21 
-Run ComBatSeq on lung 2025-01-24 15:18:24 
+Run ComBatSeq on fat 2025-02-12 20:42:51 
 
-Assays in SCE Blood: counts logcounts ComBatSeq 
-Assays in SCE Lung: counts logcounts ComBatSeq 
+Assays in SCE Fat: counts logcounts ComBatSeq 
 
-Save SCE objects at 2025-01-24 16:49:40 
+Save SCE objects at 2025-02-12 21:20:44 
 
 
-Convert objects back to Seurat at 2025-01-24 16:56:41 
-Save batch corrected seurat object at 2025-01-24 16:57:06 
+Convert objects back to Seurat at 2025-02-12 21:22:57 
+Save batch corrected seurat object at 2025-02-12 21:23:05 
 
 
-Overwrite batch corrected seurat object at 2025-01-24 17:00:32 
+Overwrite batch corrected seurat object at 2025-02-12 21:24:00 
 
-Saved filtered, batch corrected objects at 2025-01-24 17:05:40 

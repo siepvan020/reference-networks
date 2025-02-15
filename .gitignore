@@ -16,8 +16,7 @@ Analysis/Rdata/*.rds
 Analysis/Rdata/*.Rdata
 
 
-Analysis_v2/data/rds/TS_v2_Blood.rds
-Analysis_v2/data/rds/TS_v2_Lung.rds
+Analysis_v2/data/rds/*.rds
 Analysis_v2/data/priors/motif_prior_names_2024.tsv
 
 Analysis_v2/output/networks/temp/*.Rdata
@@ -28,3 +27,4 @@ Analysis_v2/output/sva_preprocessing/blood_preprocessed.rds
 Analysis_v2/output/sva_preprocessing/lung_preprocessed.rds
 Analysis_v2/scripts/sva_preprocessing.R
 Analysis_v2/output/log/sva_preprocess.log
+Analysis_v2/data/rds/TS_All_Tissues/*

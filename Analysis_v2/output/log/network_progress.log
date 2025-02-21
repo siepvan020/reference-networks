@@ -1,38 +1,38 @@
-Starting script at 2025-02-13 16:05:09 
-- Loaded Seurat objects - 2025-02-13 16:05:21 
-- Loaded priors - 2025-02-13 16:05:25 
+Starting script at 2025-02-20 16:54:05 
+- Loaded Seurat objects - 2025-02-20 16:54:26 
+- Loaded priors - 2025-02-20 16:54:30 
+
+- Starting: cd4_positive_t_cell 
+- Starting: -  2025-02-20 16:55:05platelet  
+ - 2025-02-20 16:55:05 
+
+- Starting: cd8_positive_t_cell  - 2025-02-20 16:55:05
+- Starting: 
+ monocyte  - 2025-02-20 16:55:05 
+
+- Finished: platelet  - 2025-02-20 20:24:37 
+
+- Finished: cd8_positive_t_cell  - 2025-02-20 20:25:21 
+
+- Finished: cd4_positive_t_cell  - 2025-02-20 20:30:38 
+
+- Finished: monocyte  - 2025-02-20 20:32:08 
+Saved SCORPION output - output/oplossing!!!!/networks/final/bloodScorpionOutput.Rdata 
 
 - Starting:
 - Starting:
-- Starting:
-- Starting:    adipose_stem_cellcd8_positive_t_cellmonocytecd4_positive_t_cell     - - - -    2025-02-13 16:05:462025-02-13 16:05:462025-02-13 16:05:462025-02-13 16:05:46    
+- Starting:  
+- Starting: cd8_positive_t_celltype_ii_pneumocyte monocyte  cd4_positive_t_cell  - - -     -2025-02-20 21:03:232025-02-20 21:03:232025-02-20 21:03:23    2025-02-20 21:03:23
 
 
+ 
 
+- Finished: cd4_positive_t_cell  - 2025-02-20 23:56:02 
 
-- Finished: monocyte  - 2025-02-13 16:39:42 
+- Finished: cd8_positive_t_cell  - 2025-02-20 23:58:14 
 
-- Finished: cd8_positive_t_cell  - 2025-02-13 16:40:25 
+- Finished: type_ii_pneumocyte  - 2025-02-21 00:15:43 
 
-- Finished: adipose_stem_cell  - 2025-02-13 16:42:33 
-
-- Finished: cd4_positive_t_cell  - 2025-02-13 16:49:36 
-Saved SCORPION output - output/networks/final/fatScorpionOutput.Rdata 
-
-- Starting:
-- Starting:  kidney_epithelial_cellcd8_positive_t_cell   -
-- Starting: -   2025-02-13 16:56:27monocyte2025-02-13 16:56:27   
- -
- 2025-02-13 16:56:27 
-
-- Starting: cd4_positive_t_cell  - 2025-02-13 16:56:27 
-
-- Finished: cd4_positive_t_cell  - 2025-02-13 17:30:06 
-
-- Finished: monocyte  - 2025-02-13 17:30:20 
-
-- Finished: cd8_positive_t_cell  - 2025-02-13 17:30:40 
-
-- Finished: kidney_epithelial_cell  - 2025-02-13 17:30:48 
-Saved SCORPION output - output/networks/final/kidneyScorpionOutput.Rdata 
-All tasks completed at 2025-02-13 17:37:28 
+- Finished: monocyte  - 2025-02-21 00:24:07 
+Saved SCORPION output - output/oplossing!!!!/networks/final/lungScorpionOutput.Rdata 
+All tasks completed at 2025-02-21 00:57:33 

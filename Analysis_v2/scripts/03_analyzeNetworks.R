@@ -28,9 +28,10 @@ load("final/bloodScorpionOutput.Rdata")
 load("final/lungScorpionOutput.Rdata")
 load("final/fatScorpionOutput.Rdata")
 load("final/kidneyScorpionOutput.Rdata")
+load("final/liverScorpionOutput.Rdata")
 
 
-#### 2. Calculate indegrees & outdegrees ####
+#### 2. Calculate indegrees & outdegrees ####       #rewrite to function!!
 blood_indegrees <- data.frame(gene = colnames(blood_output[[1]]$regNet))
 for (celltype in names(blood_output)) {
     regnet <- blood_output[[celltype]]$regNet
@@ -51,7 +52,11 @@ for (celltype in names(kidney_output)) {
     regnet <- kidney_output[[celltype]]$regNet
     kidney_indegrees[[paste0("kidney_", celltype)]] <- colSums(regnet)
 }
-
+liver_indegrees <- data.frame(gene = colnames(liver_output[[1]]$regNet))
+for (celltype in names(liver_output)) {
+    regnet <- liver_output[[celltype]]$regNet
+    liver_indegrees[[paste0("liver_", celltype)]] <- colSums(regnet)
+}
 
 
 blood_outdegrees <- data.frame(tf = rownames(blood_output[[1]]$regNet))
@@ -62,46 +67,32 @@ for (celltype in names(blood_output)) {
 
 
 # Combine blood and lung indegrees and outdegrees into one dataframe
-combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees, fat_indegrees, kidney_indegrees))
+combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees, fat_indegrees, kidney_indegrees, liver_indegrees))
+# combined_indegrees <- na.omit(combined_indegrees)
 
 # Calculate correlation matrix
 cor_indegree_matrix <- cor(combined_indegrees[, -1])
 
-# Calculate RMSE??
-rmse_indegree <- sqrt(mean((combined_indegrees$blood_cd4_positive_t_cell - combined_indegrees$lung_type_ii_pneumocyte)^2))
 
-
-
-#### 3. Plot indegrees between conditions ####
-# ggplot(combined_indegrees, aes(x = blood_cd4_positive_t_cell, y = blood_cd8_positive_t_cell)) +
-#     geom_point() +
-#     labs(
-#         title = "Indegree Comparison between CD4+ and CD8+ T Cells in Blood",
-#         x = "CD4+ T Cell Indegree",
-#         y = "CD8+ T Cell Indegree"
-#     ) +
-#     geom_smooth(method = lm, formula = y ~ x, color = "red", fill = "#69b3a2", se = TRUE) +
-#     theme_minimal()
-
-
-#### 4. Calculate actual linear regression and residuals ####
+#### 3. Calculate linear regression and residuals ####
 x <- combined_indegrees$blood_cd4_positive_t_cell
-y <- combined_indegrees$lung_type_ii_pneumocyte
+y <- combined_indegrees$blood_cd8_positive_t_cell
 fit <- lm(y ~ x, data = combined_indegrees)
+# plot(x, y)
 
 # Extract residuals and rank them
 res_df <- residuals(fit)
 names(res_df) <- combined_indegrees$gene
 ranked_df <- res_df[order(-res_df)]
 
-# Plot the linear model and residuals
-ggplot(combined_indegrees, aes(x = blood_platelet, y = lung_type_ii_pneumocyte)) +
+# Plot the linear model
+ggplot(combined_indegrees, aes(x = blood_cd4_positive_t_cell, y = blood_cd8_positive_t_cell)) +
     geom_point() +
     geom_smooth(method = "lm", formula = y ~ x, color = "red", fill = "#69b3a2", se = TRUE) +
     labs(
-        title = "Linear Regression of CD4+ T Cell (blood) and type II pneumocytes Indegrees",
-        x = "CD4+ T Cell Indegree",
-        y = "Type II Pneumocyte Indegree"
+        title = "Linear Regression of Blood CD4+ T Cell and Blood CD8+ T Cell Indegrees",
+        x = "Blood CD4+ T Cell Indegree",
+        y = "Blood CD8+ T Cell Indegree"
     ) +
     theme_minimal()
 
@@ -134,6 +125,7 @@ gse_bp <- clusterProfiler::gseGO(ranked_df,
     pvalueCutoff = 0.5 # ,
     # eps = 1e-300
 )
+gse_bp@result
 
 hist(gse_bp@result$p.adjust)
 

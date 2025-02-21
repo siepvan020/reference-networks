@@ -7,6 +7,9 @@ progress_file <- "/div/pythagoras/u1/siepv/siep/Analysis_v2/output/log/network_p
 # Start fresh log or append
 cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
 
+# Set CRAN mirror
+options(repos = c(CRAN = "https://cran.r-project.org"))
+
 # Install required packages
 if (!requireNamespace("Seurat", quietly = TRUE)) install.packages("Seurat")
 if (!requireNamespace("SCORPION", quietly = TRUE)) install.packages("SCORPION")
@@ -25,17 +28,19 @@ setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 #### 2. Load data ####
 
-# Load Seurat objects                           ## write function for this?
-blood_object <- readRDS("output/preprocessing/blood_preprocessed_batch.rds")
-Idents(blood_object) <- "cell_type"
-lung_object <- readRDS("output/preprocessing/lung_preprocessed_batch.rds")
-Idents(lung_object) <- "cell_type"
-fat_object <- readRDS("output/preprocessing/fat_preprocessed_batch.rds")
-Idents(fat_object) <- "cell_type"
-kidney_object <- readRDS("output/preprocessing/kidney_preprocessed.rds")
-Idents(kidney_object) <- "cell_type"
-liver_object <- readRDS("output/preprocessing/liver_preprocessed_batch.rds")
-Idents(liver_object) <- "cell_type"
+# Function to load Seurat objects and set cell type identities
+load_seurat_object <- function(file_path) {
+    object <- readRDS(file_path)
+    Idents(object) <- "cell_type"
+    return(object)
+}
+
+# Load Seurat objects
+blood_object <- load_seurat_object("output/preprocessing/blood_filter.rds")
+lung_object <- load_seurat_object("output/preprocessing/lung_filter.rds")
+fat_object <- load_seurat_object("output/preprocessing/fat_filter.rds")
+kidney_object <- load_seurat_object("output/preprocessing/kidney_filter.rds")
+liver_object <- load_seurat_object("output/preprocessing/liver_filter.rds")
 
 cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
@@ -117,7 +122,7 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
 # Run SCORPION for blood
 run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput.Rdata")
 
-# # Run SCORPION for lung
+# Run SCORPION for lung
 run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput.Rdata")
 
 # Run SCORPION for fat

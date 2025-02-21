@@ -1,24 +1,6 @@
 #!/usr/bin/env Rscript
 
-
-progress_file <- "/div/pythagoras/u1/siepv/siep/Analysis_v2/output/log/preprocess.log"
-cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
-
-# Load required packages
-if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
-if (!requireNamespace("Seurat", quietly = TRUE)) install.packages("Seurat")
-if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-if (!requireNamespace("singleCellTK", quietly = TRUE)) BiocManager::install("singleCellTK")
-if (!requireNamespace("Matrix", quietly = TRUE)) install.packages("Matrix")
-if (!requireNamespace("ggplot2", quietly = TRUE)) install.packages("ggplot2")
-
 library(Seurat)
-library(Matrix)
-library(singleCellTK)
-library(ggplot2)
-
-cat("Loaded required packages at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-
 
 
 # Set working directory
@@ -31,92 +13,61 @@ lung_object <- readRDS("TS_v2_Lung.rds")
 fat_object <- readRDS("TS_v2_Fat.rds")
 kidney_object <- readRDS("TS_v2_Kidney.rds")
 liver_object <- readRDS("TS_v2_Liver.rds")
-cat("Loaded data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 2. Correct cell type annotations ####
-blood_object@meta.data$cell_type <- as.character(blood_object@meta.data$cell_type)
-lung_object@meta.data$cell_type <- as.character(lung_object@meta.data$cell_type)
-fat_object@meta.data$cell_type <- as.character(fat_object@meta.data$cell_type)
-kidney_object@meta.data$cell_type <- as.character(kidney_object@meta.data$cell_type)
-liver_object@meta.data$cell_type <- as.character(liver_object@meta.data$cell_type)
+
+# Function to merge cell types into a new label
+merge_cell_types <- function(object, cell_type_mappings) {
+    object@meta.data$cell_type <- as.character(object@meta.data$cell_type)
+    for (new_label in names(cell_type_mappings)) {
+        old_labels <- cell_type_mappings[[new_label]]
+        object@meta.data$cell_type[object@meta.data$cell_type %in% old_labels] <- new_label
+    }
+    return(object)
+}
 
 
-# Define which cell types should be merged into a new label
-#################################################################################### Blood
-blood_object@meta.data$cell_type[blood_object@meta.data$cell_type %in% c(
-    "classical monocyte",
-    "non-classical monocyte",
-    "intermediate monocyte",
-    "monocyte"
-)] <- "monocyte"
-blood_object@meta.data$cell_type[blood_object@meta.data$cell_type %in% c(
-    "CD4-positive, alpha-beta T cell",
-    "naive thymus-derived CD4-positive, alpha-beta T cell"
-)] <- "cd4_positive_t_cell"
-blood_object@meta.data$cell_type[blood_object@meta.data$cell_type %in% c(
-    "CD8-positive, alpha-beta T cell"
-)] <- "cd8_positive_t_cell"
-#################################################################################### Lung
-lung_object@meta.data$cell_type[lung_object@meta.data$cell_type %in% c(
-    "classical monocyte",
-    "non-classical monocyte",
-    "intermediate monocyte",
-    "monocyte"
-)] <- "monocyte"
-lung_object@meta.data$cell_type[lung_object@meta.data$cell_type %in% c(
-    "CD4-positive, alpha-beta T cell"
-)] <- "cd4_positive_t_cell"
-lung_object@meta.data$cell_type[lung_object@meta.data$cell_type %in% c(
-    "CD8-positive, alpha-beta T cell"
-)] <- "cd8_positive_t_cell"
-lung_object@meta.data$cell_type[lung_object@meta.data$cell_type %in% c(
-    "pulmonary alveolar type 2 cell"
-)] <- "type_ii_pneumocyte"
-#################################################################################### Fat
-fat_object@meta.data$cell_type[fat_object@meta.data$cell_type %in% c(
-    "classical monocyte",
-    "non-classical monocyte",
-    "intermediate monocyte",
-    "monocyte"
-)] <- "monocyte"
-fat_object@meta.data$cell_type[fat_object@meta.data$cell_type %in% c(
-    "CD4-positive, alpha-beta T cell"
-)] <- "cd4_positive_t_cell"
-fat_object@meta.data$cell_type[fat_object@meta.data$cell_type %in% c(
-    "CD8-positive, alpha-beta T cell"
-)] <- "cd8_positive_t_cell"
-fat_object@meta.data$cell_type[fat_object@meta.data$cell_type %in% c(
-    "mesenchymal stem cell of adipose tissue"
-)] <- "adipose_stem_cell"
-#################################################################################### Kidney
-kidney_object@meta.data$cell_type[kidney_object@meta.data$cell_type %in% c(
-    "non-classical monocyte",
-    "intermediate monocyte",
-    "monocyte"
-)] <- "monocyte"
-kidney_object@meta.data$cell_type[kidney_object@meta.data$cell_type %in% c(
-    "CD4-positive, alpha-beta T cell"
-)] <- "cd4_positive_t_cell"
-kidney_object@meta.data$cell_type[kidney_object@meta.data$cell_type %in% c(
-    "CD8-positive, alpha-beta T cell"
-)] <- "cd8_positive_t_cell"
-kidney_object@meta.data$cell_type[kidney_object@meta.data$cell_type %in% c(
-    "kidney epithelial cell"
-)] <- "kidney_epithelial_cell"
-#################################################################################### Liver
-liver_object@meta.data$cell_type[liver_object@meta.data$cell_type %in% c(
-    "classical monocyte",
-    "non-classical monocyte",
-    "intermediate monocyte",
-    "monocyte"
-)] <- "monocyte"
-liver_object@meta.data$cell_type[liver_object@meta.data$cell_type %in% c(
-    "CD4-positive, alpha-beta T cell"
-)] <- "cd4_positive_t_cell"
-liver_object@meta.data$cell_type[liver_object@meta.data$cell_type %in% c(
-    "CD8-positive, alpha-beta T cell"
-)] <- "cd8_positive_t_cell"
+# Define cell type mappings for each object
+blood_mappings <- list(
+    "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
+    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell", "naive thymus-derived CD4-positive, alpha-beta T cell"),
+    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell")
+)
+
+lung_mappings <- list(
+    "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
+    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
+    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
+    "type_ii_pneumocyte" = c("pulmonary alveolar type 2 cell")
+)
+
+fat_mappings <- list(
+    "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
+    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
+    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
+    "adipose_stem_cell" = c("mesenchymal stem cell of adipose tissue")
+)
+
+kidney_mappings <- list(
+    "monocyte" = c("non-classical monocyte", "intermediate monocyte", "monocyte"),
+    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
+    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
+    "kidney_epithelial_cell" = c("kidney epithelial cell")
+)
+
+liver_mappings <- list(
+    "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
+    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
+    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell")
+)
+
+# Apply the function to each object
+blood_object <- merge_cell_types(blood_object, blood_mappings)
+lung_object <- merge_cell_types(lung_object, lung_mappings)
+fat_object <- merge_cell_types(fat_object, fat_mappings)
+kidney_object <- merge_cell_types(kidney_object, kidney_mappings)
+liver_object <- merge_cell_types(liver_object, liver_mappings)
 
 
 #### 3. Filter only relevant cell types ####
@@ -127,35 +78,73 @@ cells_to_keep_fat <- rownames(fat_object@meta.data[fat_object@meta.data$cell_typ
 cells_to_keep_kidney <- rownames(kidney_object@meta.data[kidney_object@meta.data$cell_type %in% append(common_celltypes, "kidney_epithelial_cell"), ])
 cells_to_keep_liver <- rownames(liver_object@meta.data[liver_object@meta.data$cell_type %in% append(common_celltypes, "hepatocyte"), ])
 
-# Apply filtering
-blood_object <- blood_object[, cells_to_keep_blood]
-lung_object <- lung_object[, cells_to_keep_lung]
-fat_object <- fat_object[, cells_to_keep_fat]
-kidney_object <- kidney_object[, cells_to_keep_kidney]
-liver_object <- liver_object[, cells_to_keep_liver]
 
-Idents(blood_object) <- blood_object@meta.data$cell_type
-Idents(lung_object) <- lung_object@meta.data$cell_type
-Idents(fat_object) <- fat_object@meta.data$cell_type
-Idents(kidney_object) <- kidney_object@meta.data$cell_type
-Idents(liver_object) <- liver_object@meta.data$cell_type
-cat("Filtered data at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+# Apply filtering
+blood_object_filter <- blood_object[, cells_to_keep_blood]
+lung_object_filter <- lung_object[, cells_to_keep_lung]
+fat_object_filter <- fat_object[, cells_to_keep_fat]
+kidney_object_filter <- kidney_object[, cells_to_keep_kidney]
+liver_object_filter <- liver_object[, cells_to_keep_liver]
+
+
+# Set active identity to cell type
+Idents(blood_object_filter) <- blood_object_filter@meta.data$cell_type
+Idents(lung_object_filter) <- lung_object_filter@meta.data$cell_type
+Idents(fat_object_filter) <- fat_object_filter@meta.data$cell_type
+Idents(kidney_object_filter) <- kidney_object_filter@meta.data$cell_type
+Idents(liver_object_filter) <- liver_object_filter@meta.data$cell_type
+
+
+#### 5. Convert ensembl ids to gene names and remove duplicates ####
+
+# Extract feature names and Ensembl IDs
+features <- data.frame(
+    gene_name = gsub("_ENSG[0-9]+", "", as.character(blood_object_filter@assays$RNA@meta.features$feature_name)),
+    ensembl_id = as.character(blood_object_filter@assays$RNA@counts@Dimnames[[1]])
+)
+
+# Identify duplicate gene names
+duplicates <- features[duplicated(features$gene_name) | duplicated(features$gene_name, fromLast = TRUE), ]
+
+# Get unique Ensembl IDs of duplicates
+genes_to_exclude <- unique(duplicates$ensembl_id)
+
+# Filter out the duplicate genes from the count matrix
+keep_genes <- !blood_object_filter@assays$RNA@counts@Dimnames[[1]] %in% genes_to_exclude
+
+# Function to update gene names and filter the expression matrix
+update_gene_names_and_filter <- function(object, keep_genes, features) {
+    object@assays$RNA@counts <- object@assays$RNA@counts[keep_genes, ]
+    object@assays$RNA@data <- object@assays$RNA@counts[keep_genes, ]
+    object@assays$RNA@counts@Dimnames[[1]] <- features$gene_name[keep_genes]
+    object@assays$RNA@data@Dimnames[[1]] <- features$gene_name[keep_genes]
+    return(object)
+}
+
+# Apply the function to each object
+blood_object_filter <- update_gene_names_and_filter(blood_object_filter, keep_genes, features)
+lung_object_filter <- update_gene_names_and_filter(lung_object_filter, keep_genes, features)
+fat_object_filter <- update_gene_names_and_filter(fat_object_filter, keep_genes, features)
+kidney_object_filter <- update_gene_names_and_filter(kidney_object_filter, keep_genes, features)
+liver_object_filter <- update_gene_names_and_filter(liver_object_filter, keep_genes, features)
 
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
-saveRDS(blood_object, file = "blood_filter.rds")
-saveRDS(lung_object, file = "lung_filter.rds")
-saveRDS(fat_object, file = "fat_filter.rds")
-saveRDS(kidney_object, file = "kidney_filter.rds")
-saveRDS(liver_object, file = "liver_filter.rds")
-cat("Saved filtered data at", format(Sys.time()), "\n\n\n", file = progress_file, append = TRUE)
+
+# Save the filtered objects
+saveRDS(blood_object_filter, "blood_filter.rds")
+saveRDS(lung_object_filter, "lung_filter.rds")
+saveRDS(fat_object_filter, "fat_filter.rds")
+saveRDS(kidney_object_filter, "kidney_filter.rds")
+saveRDS(liver_object_filter, "liver_filter.rds")
+
 
 
 #### 4. Batch correction ####   note that kidney is not included, as this tissue only has one donor
 
-sce_blood <- Seurat::as.SingleCellExperiment(blood_object)
-sce_lung <- Seurat::as.SingleCellExperiment(lung_object)
-sce_fat <- Seurat::as.SingleCellExperiment(fat_object)
-sce_liver <- Seurat::as.SingleCellExperiment(liver_object)
+sce_blood <- Seurat::as.SingleCellExperiment(blood_object_filter)
+sce_lung <- Seurat::as.SingleCellExperiment(lung_object_filter)
+sce_fat <- Seurat::as.SingleCellExperiment(fat_object_filter)
+sce_liver <- Seurat::as.SingleCellExperiment(liver_object_filter)
 
 cat("Run ComBatSeq on blood", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 sce_blood <- singleCellTK::runComBatSeq(sce_blood, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
@@ -193,27 +182,20 @@ saveRDS(batch_fat_obj, file = "fat_filter_batch.rds")
 saveRDS(batch_liver_obj, file = "liver_filter_batch.rds")
 
 
-# Ensure the corrected matrix is assigned to RNA counts in Seurat          ### CHANGE TO LESS REDUNDANCY
-if ("ComBatSeq" %in% assayNames(sce_blood)) {
-    batch_blood_obj@assays$RNA@counts <- assay(sce_blood, "ComBatSeq")
-} else {
-    cat("Warning: ComBatSeq assay missing in SCE blood object!\n", file = progress_file, append = TRUE)
+# Ensure the corrected matrix is assigned to RNA counts in Seurat
+update_counts_with_combatseq <- function(sce_object, seurat_object, tissue_name) {
+    if ("ComBatSeq" %in% assayNames(sce_object)) {
+        seurat_object@assays$RNA@counts <- assay(sce_object, "ComBatSeq")
+    } else {
+        cat(paste("Warning: ComBatSeq assay missing in SCE", tissue_name, "object!\n"), file = progress_file, append = TRUE)
+    }
+    return(seurat_object)
 }
-if ("ComBatSeq" %in% assayNames(sce_lung)) {
-    batch_lung_obj@assays$RNA@counts <- assay(sce_lung, "ComBatSeq")
-} else {
-    cat("Warning: ComBatSeq assay missing in SCE lung object!\n", file = progress_file, append = TRUE)
-}
-if ("ComBatSeq" %in% assayNames(sce_fat)) {
-    batch_fat_obj@assays$RNA@counts <- assay(sce_fat, "ComBatSeq")
-} else {
-    cat("Warning: ComBatSeq assay missing in SCE fat object!\n", file = progress_file, append = TRUE)
-}
-if ("ComBatSeq" %in% assayNames(sce_liver)) {
-    batch_liver_obj@assays$RNA@counts <- assay(sce_liver, "ComBatSeq")
-} else {
-    cat("Warning: ComBatSeq assay missing in SCE liver object!\n", file = progress_file, append = TRUE)
-}
+
+batch_blood_obj <- update_counts_with_combatseq(sce_blood, batch_blood_obj, "blood")
+batch_lung_obj <- update_counts_with_combatseq(sce_lung, batch_lung_obj, "lung")
+batch_fat_obj <- update_counts_with_combatseq(sce_fat, batch_fat_obj, "fat")
+batch_liver_obj <- update_counts_with_combatseq(sce_liver, batch_liver_obj, "liver")
 
 
 #### 5. Save preprocessed data ####

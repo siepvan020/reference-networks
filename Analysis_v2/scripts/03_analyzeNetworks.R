@@ -2,23 +2,18 @@
 
 
 # Install required packages
-if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) BiocManager::install("org.Hs.eg.db")
-if (!requireNamespace("biomaRt", quietly = TRUE)) BiocManager::install("biomaRt")
-if (!requireNamespace("msigdbr", quietly = TRUE)) BiocManager::install("msigdbr")
-
-if (!requireNamespace("clusterProfiler", quietly = TRUE)) BiocManager::install("clusterProfiler")
-if (!requireNamespace("AnnotationDbi", quietly = TRUE)) BiocManager::install("AnnotationDbi")
-
 if (!requireNamespace("ggplot2", quietly = TRUE)) install.packages("ggplot2")
+if (!requireNamespace("Matrix", quietly = TRUE)) install.packages("Matrix")
+
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+if (!requireNamespace("msigdbr", quietly = TRUE)) BiocManager::install("msigdbr")
+if (!requireNamespace("fgsea", quietly = TRUE)) BiocManager::install("fgsea")
 
 # Load required packages
 library(ggplot2)
-library(org.Hs.eg.db)
-library(biomaRt)
 library(msigdbr)
-library(clusterProfiler) # gseGO
-library(AnnotationDbi)
+library(fgsea)
+library(Matrix)
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/networks")
@@ -58,14 +53,6 @@ for (celltype in names(liver_output)) {
     liver_indegrees[[paste0("liver_", celltype)]] <- colSums(regnet)
 }
 
-
-blood_outdegrees <- data.frame(tf = rownames(blood_output[[1]]$regNet))
-for (celltype in names(blood_output)) {
-    regnet <- blood_output[[celltype]]$regNet
-    blood_outdegrees[[paste0("blood_", celltype)]] <- rowSums(regnet)
-}
-
-
 # Combine blood and lung indegrees and outdegrees into one dataframe
 combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees, fat_indegrees, kidney_indegrees, liver_indegrees))
 # combined_indegrees <- na.omit(combined_indegrees)
@@ -74,111 +61,139 @@ combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE)
 cor_indegree_matrix <- cor(combined_indegrees[, -1])
 
 
-#### 3. Calculate linear regression and residuals ####
-x <- combined_indegrees$blood_cd4_positive_t_cell
-y <- combined_indegrees$blood_cd8_positive_t_cell
-fit <- lm(y ~ x, data = combined_indegrees)
-# plot(x, y)
+#### 3. Calculate linear regression and residuals between conditions ####
 
-# Extract residuals and rank them
-res_df <- residuals(fit)
-names(res_df) <- combined_indegrees$gene
-ranked_df <- res_df[order(-res_df)]
+# Define comparisons
+comparisons <- list(
+    list(name = "blood_platelet_vs_lung_pneumo", x = "blood_platelet", y = "lung_type_ii_pneumocyte"),
+    list(name = "blood_cd4_vs_cd8", x = "blood_cd4_positive_t_cell", y = "blood_cd8_positive_t_cell"),
+    list(name = "blood_cd4_vs_monocyte", x = "blood_cd4_positive_t_cell", y = "blood_monocyte"),
+    list(name = "lung_cd4_vs_cd8", x = "lung_cd4_positive_t_cell", y = "lung_cd8_positive_t_cell"),
+    list(name = "lung_cd4_vs_monocyte", x = "lung_cd4_positive_t_cell", y = "lung_monocyte"),
+    list(name = "cd4_blood_vs_lung", x = "blood_cd4_positive_t_cell", y = "lung_cd4_positive_t_cell"),
+    list(name = "cd8_blood_vs_lung", x = "blood_cd8_positive_t_cell", y = "lung_cd8_positive_t_cell")
+)
 
-# Plot the linear model
-ggplot(combined_indegrees, aes(x = blood_cd4_positive_t_cell, y = blood_cd8_positive_t_cell)) +
-    geom_point() +
-    geom_smooth(method = "lm", formula = y ~ x, color = "red", fill = "#69b3a2", se = TRUE) +
+# Function to fit linear model and extract + rank residuals descending
+calculate_residuals <- function(data, x_con, y_con) {
+    fit <- lm(data[[y_con]] ~ data[[x_con]], data = data) # Fit linear model
+    res <- residuals(fit)
+    names(res) <- data$gene
+    return(res[order(-res)]) # Rank residuals
+}
+
+residuals_list <- list()
+for (comp in comparisons) {
+    cat("Calculating residuals for:", comp$name, "\n")
+    residuals_list[[comp$name]] <- calculate_residuals(combined_indegrees, comp$x, comp$y)
+}
+
+
+#### 4. Run GSEA on residuals ####
+
+# Load gene sets for GO:BP and GO:MF using gene symbols
+msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")[, c("gs_name", "gene_symbol")]
+msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "MF")[, c("gs_name", "gene_symbol")]
+
+# Convert to fgsea-compatible format (list of gene sets)
+msigdb_BP_list <- split(msigdb_BP$gene_symbol, msigdb_BP$gs_name)
+msigdb_MF_list <- split(msigdb_MF$gene_symbol, msigdb_MF$gs_name)
+
+
+gsea_results <- list()
+
+for (comp in names(residuals_list[1:2])) {
+    cat("Running GSEA for:", comp, "\n")
+
+    ranked_genes <- residuals_list[[comp]] # Get ranked gene list
+
+    # Run fgsea for GO:BP
+    gsea_results[[paste0(comp, "_BP")]] <- fgsea(
+        pathways = msigdb_BP_list,
+        stats = ranked_genes,
+        minSize = 10,
+        maxSize = 500,
+        nproc = 1
+    )
+
+    # Run fgsea for GO:MF
+    gsea_results[[paste0(comp, "_MF")]] <- fgsea(
+        pathways = msigdb_MF_list,
+        stats = ranked_genes,
+        minSize = 10,
+        maxSize = 500,
+        nperm = 10000
+    )
+}
+
+
+
+
+
+##### plot gsea test
+
+library(ggplot2)
+library(dplyr)
+
+gsea_results$blood_platelet_vs_lung_pneumo_BP %>%
+    arrange(padj) %>%
+    head(20) %>%
+    ggplot(aes(reorder(pathway, NES), NES, fill = padj < 0.05)) +
+    geom_col() +
+    coord_flip() +
+    scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "gray")) +
     labs(
-        title = "Linear Regression of Blood CD4+ T Cell and Blood CD8+ T Cell Indegrees",
-        x = "Blood CD4+ T Cell Indegree",
-        y = "Blood CD8+ T Cell Indegree"
+        x = "Pathway",
+        y = "Normalized Enrichment Score (NES)",
+        title = "Top 20 Enriched Pathways"
     ) +
     theme_minimal()
 
-# Plot residuals
-residuals_df <- data.frame(gene = names(res_df), residuals = res_df)
-ggplot(residuals_df, aes(x = seq_along(residuals), y = residuals)) +
-    geom_point() +
-    geom_hline(yintercept = 0, color = "red") +
-    labs(
-        title = "Residuals of Linear Regression",
-        x = "ID",
-        y = "Residuals"
-    ) +
-    theme_minimal()
+
+# Extract the first pathway name
+first_pathway <- gsea_results[[1]]$pathway[1]
+
+# Extract the ranked gene list for the first comparison
+ranked_genes <- residuals_list[[names(residuals_list)[1]]]
+ranked_genes <- sort(ranked_genes, decreasing = TRUE) # Ensure it's sorted
+
+# Plot the enrichment for the first pathway
+plotEnrichment(
+    pathway = msigdb_BP_list[["GOBP_TRNA_METABOLIC_PROCESS"]], # Get gene set for first pathway
+    stats = ranked_genes
+) + labs(title = paste("Enrichment Plot:", first_pathway))
 
 
 
-############## Optie 1 #############
+top_genes <- names(residuals_list$blood_platelet_vs_lung_pneumo)[1:1000] # Take the top 500 most deviated genes
+neg_genes <- names(rev(residuals_list$blood_platelet_vs_lung_pneumo))[1:1000]
 
-# Convert ENSEMBL IDs to ENTREZ IDs ### ensembl IDs worden niet herkend door gseGO?? dus eerst omzetten naar entrez
-gene_conversion <- clusterProfiler::bitr(names(ranked_df), fromType = "ENSEMBL", toType = "ENTREZID", OrgDb = "org.Hs.eg.db")
-ranked_list <- ranked_list[gene_conversion$ENSEMBL]
-names(ranked_list) <- gene_conversion$ENTREZID
+missing_top_genes <- setdiff(top_genes, msigdb_BP$gene_symbol)
+missing_neg_genes <- setdiff(neg_genes, msigdb_BP$gene_symbol)
 
-#### 5. Perform gene set enrichment analysis ####
-gse_bp <- clusterProfiler::gseGO(ranked_df,
-    ont = "BP",
-    keyType = "ENSEMBL",
-    OrgDb = "org.Hs.eg.db",
-    pvalueCutoff = 0.5 # ,
-    # eps = 1e-300
-)
-gse_bp@result
+mf_missing_top_genes <- setdiff(top_genes, msigdb_MF$gene_symbol)
+mf_missing_neg_genes <- setdiff(neg_genes, msigdb_MF$gene_symbol)
 
-hist(gse_bp@result$p.adjust)
-
-as.data.frame(gse_bp)
+length(missing_top_genes) # How many top genes are missing?
+length(missing_neg_genes) # How many bottom genes are missing?
+head(missing_top_genes) # See which ones
+head(missing_neg_genes) # See which ones
 
 
-gse_mf <- clusterProfiler::gseGO(ranked_df,
-    ont = "MF",
-    keyType = "ENSEMBL",
-    OrgDb = "org.Hs.eg.db",
-    pvalueCutoff = 0.05 # ,
-    # eps = 1e-300
-)
+library(biomaRt)
 
-as.data.frame(gse_mf)
+# Connect to Ensembl
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 
-# check hoeveel ID's er in de database overeenkomen
-sum(names(ranked_df) %in% keys(org.Hs.eg.db, keytype = "ENSEMBL"))
-
-
-
-
-########### Optie 2 #############
-
-msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")
-msigdb_BP <- msigdb_BP[, c("gs_name", "ensembl_gene")]
-# does not work, term2gene needs a df
-# msigdb_BP <- split(msigdb_BP$ensembl_gene, msigdb_BP$gs_name)
-
-gsea_BP <- clusterProfiler::GSEA(ranked_df, TERM2GENE = msigdb_BP, pvalueCutoff = 1)
-
-sum(names(ranked_df) %in% msigdb_BP$ensembl_gene)
-
-converted <- clusterProfiler::bitr(names(ranked_df), fromType = "ENSEMBL", toType = "ENTREZID", OrgDb = "org.Hs.eg.db")
-
-
-
-
-
-########### optie 3?? ##############
-
-# Connect to the ENSEMBL database
-ensembl <- biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-
-# Try to get updated mappings
-converted_ids <- getBM(
-    attributes = c("ensembl_gene_id", "ensembl_gene_id_version"),
-    filters = "ensembl_gene_id",
-    values = names(ranked_df),
+# Get gene biotypes for missing genes
+gene_annotations <- getBM(
+    attributes = c("external_gene_name", "gene_biotype"),
+    filters = "external_gene_name",
+    values = missing_top_genes, # or missing_neg_genes
     mart = ensembl
 )
-converted_ids <- converted_ids[!is.na(converted_ids$ensembl_gene_id_version), ]
-ranked_df <- ranked_df[converted_ids$ensembl_gene_id]
-names(ranked_df) <- converted_ids$ensembl_gene_id_version
 
-gsea_BP <- clusterProfiler::GSEA(ranked_df, TERM2GENE = msigdb_BP, pvalueCutoff = 0.05)
+# Check how many are lncRNAs
+lncRNAs <- subset(gene_annotations, gene_biotype == "lncRNA")
+prcoding <- subset(gene_annotations, gene_biotype == "protein_coding")
+head(prcoding)

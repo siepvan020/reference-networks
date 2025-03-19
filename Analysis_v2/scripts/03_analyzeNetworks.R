@@ -16,7 +16,9 @@ library(msigdbr)
 library(fgsea)
 library(Matrix)
 library(dplyr)
-library(biomaRt)
+library(stringr)
+library(scales)
+# library(biomaRt)
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/networks")
@@ -59,7 +61,7 @@ cor_long <- as.data.frame(as.table(cor_indegree_matrix))
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/analysis")
 
 # Plot the one-sided correlation matrix with values in the tiles
-ggsave("correlation_matrix_indegrees.pdf", ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
+ggsave("correlation/correlation_matrix_indegrees.pdf", ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
     geom_tile(na.rm = TRUE) +
     geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
     scale_fill_gradient(low = "white", high = "steelblue", name = "Pearson's r value") +
@@ -90,17 +92,41 @@ calculate_residuals <- function(data, x_con, y_con) {
     return(list(fit = fit, residuals = res[order(-res)])) # Return fit and ranked residuals
 }
 
-# Function to plot linear regression with ggplot
-plot_linear_regression <- function(data, x_con, y_con, comp_name) {
-    ggplot(data, aes(x = x_con, y = y_con)) +
+# Function to plot linear regression with ggplot and label extreme residuals
+plot_linear_regression <- function(data, x_con, y_con, comp_name, residuals) {
+    top_gene <- names(residuals)[1] # Gene with highest residual
+    bottom_gene <- names(residuals)[length(residuals)] # Gene with lowest residual
+
+    ggplot(data, aes(x = .data[[x_con]], y = .data[[y_con]])) +
         geom_point(alpha = 0.5) +
+        geom_point(
+            data = data %>% filter(gene %in% c(top_gene, bottom_gene)),
+            aes(color = gene),
+            size = 3
+        ) +
+        scale_color_manual(values = setNames(c("red", "blue"), c(top_gene, bottom_gene))) +
         geom_smooth(method = "lm", se = FALSE, color = "red") +
+        geom_text(
+            data = data %>% filter(gene == top_gene),
+            aes(label = gene, color = gene),
+            vjust = -1,
+            size = 5,
+            fontface = "bold"
+        ) +
+        geom_text(
+            data = data %>% filter(gene == bottom_gene),
+            aes(label = gene, color = gene),
+            vjust = 1.5,
+            size = 5,
+            fontface = "bold"
+        ) +
         labs(
             title = paste("Linear Regression:", comp_name),
             x = x_con,
             y = y_con
         ) +
-        theme_minimal()
+        theme_minimal() +
+        theme(legend.position = "none")
 }
 
 # Calculate residuals for each comparison
@@ -112,13 +138,13 @@ for (comp in comparisons) {
     result <- calculate_residuals(combined_indegrees, comp$x, comp$y)
     residuals_list[[comp$name]] <- result$residuals
     fit_list[[comp$name]] <- result$fit
-    plot_list[[comp$name]] <- plot_linear_regression(combined_indegrees, comp$x, comp$y, comp$name)
+    plot_list[[comp$name]] <- plot_linear_regression(combined_indegrees, comp$x, comp$y, comp$name, result$residuals)
 }
 
 # Save plots of the linear regression models
-ggsave("immune_cells_between_tissues.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
-ggsave("immune_cells_lung.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
-ggsave("tissue_specific_linear.pdf", plot_list[[7]], width = 12, height = 6)
+ggsave("linear_regression/immune_cells_between_tissues.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
+ggsave("linear_regression/immune_cells_lung.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
+ggsave("linear_regression/tissue_specific_linear.pdf", plot_list[[7]], width = 12, height = 6)
 
 
 
@@ -161,69 +187,94 @@ for (comp in names(residuals_list)) {
 }
 
 
-# Function to plot top pathways
-plot_top_pathways <- function(gsea_result, comparison_name) {
+# Function to get top up and down pathways
+get_top_pathways <- function(gsea_result) {
     sig_pathways <- gsea_result %>%
         filter(padj < 0.05)
 
-    topPathwaysUp <- head(sig_pathways[NES > 0], 10) %>%
-        arrange(NES)
-    topPathwaysUp$pathway <- factor(topPathwaysUp$pathway, levels = topPathwaysUp$pathway)
+    sig_pathways <- sig_pathways %>%
+        mutate(
+            pathway = gsub("_", " ", as.character(pathway)),
+            pathway = str_wrap(pathway, width = 50, whitespace_only = FALSE),
+            pathway = gsub(" ", "_", pathway)
+        )
 
-    topPathwaysDown <- head(sig_pathways[NES < 0], 10) %>%
-        arrange(NES)
-    topPathwaysDown$pathway <- factor(topPathwaysDown$pathway, levels = topPathwaysDown$pathway)
+    topPathwaysUp <- sig_pathways %>%
+        filter(NES > 0) %>%
+        arrange(desc(NES)) %>%
+        head(10) %>%
+        mutate(pathway = factor(pathway, levels = pathway))
 
-    topPathways <- bind_rows(topPathwaysUp, topPathwaysDown) %>%
-        arrange(NES)
-    topPathways$pathway <- factor(topPathways$pathway, levels = topPathways$pathway)
+    topPathwaysDown <- sig_pathways %>%
+        filter(NES < 0) %>%
+        arrange(NES) %>%
+        head(10) %>%
+        mutate(pathway = factor(pathway, levels = pathway))
 
-    p1 <- ggplot(topPathwaysUp, aes(x = NES, y = pathway, size = size, fill = NES)) +
+    return(list(up = topPathwaysUp, down = topPathwaysDown))
+}
+
+
+# Function to plot top pathways
+plot_top_pathways <- function(topPathways, comparison_name) {
+    p1 <- ggplot(topPathways$up, aes(x = NES, y = reorder(pathway, NES), size = size, fill = NES)) +
         geom_point(shape = 21) +
         scale_size_area(max_size = 10) +
         scale_fill_gradient(low = "white", high = "red") +
-        theme(axis.text.y = element_text(size = 11), axis.title.y = element_blank()) +
-        xlim(min(topPathwaysUp$NES), max(topPathwaysUp$NES)) +
+        theme(
+            axis.text.y = element_text(size = 14),
+            axis.title.y = element_blank(),
+            plot.title = element_text(hjust = 1, face = "bold") # Make title bold
+        ) +
+        xlim(min(topPathways$up$NES), max(topPathways$up$NES)) +
         xlab("NES") +
-        ggtitle(paste("Top 10 enriched pathways in", comparison_name, "upregulated"))
+        ggtitle(paste("Top 10 positively enriched pathways in", comparison_name))
 
-    p2 <- ggplot(topPathwaysDown, aes(x = NES, y = pathway, size = size, fill = NES)) +
+    p2 <- ggplot(topPathways$down, aes(x = NES, y = pathway, size = size, fill = NES)) +
         geom_point(shape = 21) +
         scale_size_area(max_size = 10) +
         scale_fill_gradient(low = "blue", high = "white") +
-        theme(axis.text.y = element_text(size = 11), axis.title.y = element_blank()) +
-        xlim(min(topPathwaysDown$NES), max(topPathwaysDown$NES)) +
+        theme(
+            axis.text.y = element_text(size = 14),
+            axis.title.y = element_blank(),
+            plot.title = element_text(hjust = 1, face = "bold") # Make title bold
+        ) +
+        xlim(min(topPathways$down$NES), max(topPathways$down$NES)) +
         xlab("NES") +
-        ggtitle(paste("Top 10 enriched pathways in", comparison_name, "downregulated"))
+        ggtitle(paste("Top 10 negatively enriched pathways in", comparison_name))
 
     return(list(up = p1, down = p2))
 }
 
 # Generate plots for all comparisons in gsea_results and save to a list
 gsea_plots <- list()
+top_pathways_list <- list()
+iteration <- 1
 for (comp in names(gsea_results)) {
+    # Generate plots
     cat("Plotting GSEA results for:", comp, "\n")
-    gsea_plots[[comp]] <- plot_top_pathways(gsea_results[[comp]], comp)
+    topPathways <- get_top_pathways(gsea_results[[comp]])
+    gsea_plots[[comp]] <- plot_top_pathways(topPathways, comp)
+    top_pathways_list[[comp]] <- topPathways
+
+    # Save plots
+    updotplot <- gsea_plots[[comp]]$up
+    downdotplot <- gsea_plots[[comp]]$down
+    pdf(file = paste0("gsea_dotplots/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
+    print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
+    dev.off()
+    iteration <- iteration + 1
 }
 
-dotplot <- gsea_plots[[7]]$up
-print(dotplot)
-filename <- paste0(names(gsea_plots)[7], "_gsea_plot.pdf")
-ggsave(filename, dotplot, width = 12, height = 8)
 
 
-
-# pdf(file = "7_gsea_top20pathways.pdf", width = 20, height = 15)
-# plotGseaTable(msigdb_BP[topPathways], stats = ranked_genes, fgseaRes = sig_pathways, gseaParam = 0.5)
-# dev.off()
-
-
+# pdf(file = "13_enrichmentPlot_last.pdf", width = 20, height = 15)
 # plotEnrichment(
-#     msigdb_BP_list[[gsea_results[[1]][order(padj), ][1]$pathway]],
+#     msigdb_BP[[gsea_results[[13]][order(NES)][2]$pathway]],
 #     ranked_genes
 # ) +
-#     labs(title = gsea_results[[1]][order(padj), ][1]$pathway)
-
+#     labs(title = gsea_results[[13]][order(NES)][2]$pathway)
+# dev.off()
 
 
 
@@ -244,24 +295,6 @@ ggsave(filename, dotplot, width = 12, height = 8)
 
 
 ##### plot gsea test
-
-library(ggplot2)
-library(dplyr)
-
-gsea_results$blood_platelet_vs_lung_pneumo_BP %>%
-    arrange(padj) %>%
-    head(20) %>%
-    ggplot(aes(reorder(pathway, NES), NES, fill = padj < 0.05)) +
-    geom_col() +
-    coord_flip() +
-    scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "gray")) +
-    labs(
-        x = "Pathway",
-        y = "Normalized Enrichment Score (NES)",
-        title = "Top 20 Enriched Pathways"
-    ) +
-    theme_minimal()
-
 
 # Extract the first pathway name
 first_pathway <- gsea_results[[1]]$pathway[1]

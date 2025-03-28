@@ -3,15 +3,17 @@
 library(Seurat)
 
 # Set working directory
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data/rds")
+setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data")
 
 
 #### 1. Load data ####
-blood_object <- readRDS("TS_v2_Blood.rds")
-lung_object <- readRDS("TS_v2_Lung.rds")
-fat_object <- readRDS("TS_v2_Fat.rds")
-kidney_object <- readRDS("TS_v2_Kidney.rds")
-liver_object <- readRDS("TS_v2_Liver.rds")
+blood_object <- readRDS("rds/TS_v2_Blood.rds")
+lung_object <- readRDS("rds/TS_v2_Lung.rds")
+fat_object <- readRDS("rds/TS_v2_Fat.rds")
+kidney_object <- readRDS("rds/TS_v2_Kidney.rds")
+liver_object <- readRDS("rds/TS_v2_Liver.rds")
+
+tf <- read.delim("priors/motif_prior_names_2024.tsv", header = FALSE, sep = "\t")
 
 
 #### 2. Correct cell type annotations ####
@@ -88,13 +90,6 @@ kidney_object_filter <- kidney_object[, cells_to_keep_kidney]
 liver_object_filter <- liver_object[, cells_to_keep_liver]
 
 
-# Set active identity to cell type
-Idents(blood_object_filter) <- blood_object_filter@meta.data$cell_type
-Idents(lung_object_filter) <- lung_object_filter@meta.data$cell_type
-Idents(fat_object_filter) <- fat_object_filter@meta.data$cell_type
-Idents(kidney_object_filter) <- kidney_object_filter@meta.data$cell_type
-Idents(liver_object_filter) <- liver_object_filter@meta.data$cell_type
-
 #### 4. Convert ensembl ids to gene names and remove duplicates ####
 
 # Extract feature names and Ensembl IDs, filtering out gene names matching the regex
@@ -116,11 +111,16 @@ keep_genes <- !rownames(blood_object_filter) %in% genes_to_exclude
 update_gene_names_and_filter <- function(object, keep_genes, features) {
 
     # Update gene names and filter duplicates
-    filtered_counts <- object@assays$RNA@counts[keep_genes, ]
+    filtered_counts <- blood_object_filter@assays$RNA@counts[keep_genes, ]
     rownames(filtered_counts) <- features$gene_name[keep_genes]
+    rownames(filtered_counts) <- gsub("\\.[0-9]+$", "", rownames(filtered_counts))
 
     # Filter out rows with ENSG gene names
-    filtered_counts <- filtered_counts[!grepl("^ENSG[0-9]+(\\.[0-9]+)?$", rownames(filtered_counts)), ]
+    # filtered_counts <- filtered_counts[!grepl("^ENSG[0-9]+(\\.[0-9]+)?$", rownames(filtered_counts)), ]
+
+    # Only take the intersect between priors and gex genes
+    common_genes <- intersect(rownames(filtered_counts), unique(tf$V2))
+    filtered_counts <- filtered_counts[common_genes, ]
 
     # Update the object's counts
     object@assays$RNA@counts <- filtered_counts
@@ -128,6 +128,8 @@ update_gene_names_and_filter <- function(object, keep_genes, features) {
     return(object)
 }
 
+#
+#
 # Apply the function to each object
 blood_object_filter <- update_gene_names_and_filter(blood_object_filter, keep_genes, features)
 lung_object_filter <- update_gene_names_and_filter(lung_object_filter, keep_genes, features)
@@ -143,6 +145,13 @@ saveRDS(lung_object_filter, "lung_filter.rds")
 saveRDS(fat_object_filter, "fat_filter.rds")
 saveRDS(kidney_object_filter, "kidney_filter.rds")
 saveRDS(liver_object_filter, "liver_filter.rds")
+
+
+
+
+
+
+
 
 
 

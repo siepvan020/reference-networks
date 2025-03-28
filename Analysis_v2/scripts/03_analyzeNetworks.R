@@ -50,7 +50,6 @@ liver_indegrees <- calculate_indegrees(liver_output, "liver")
 
 # Combine blood and lung indegrees and outdegrees into one dataframe
 combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees)) # , fat_indegrees, kidney_indegrees, liver_indegrees))
-# combined_indegrees <- na.omit(combined_indegrees)
 
 # Calculate correlation matrix
 cor_indegree_matrix <- cor(combined_indegrees[, -1])

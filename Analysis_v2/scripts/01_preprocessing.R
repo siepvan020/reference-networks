@@ -2,7 +2,6 @@
 
 library(Seurat)
 
-
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data/rds")
 
@@ -24,9 +23,11 @@ merge_cell_types <- function(object, cell_type_mappings) {
         old_labels <- cell_type_mappings[[new_label]]
         object@meta.data$cell_type[object@meta.data$cell_type %in% old_labels] <- new_label
     }
+
+    # Seurat::DietSeurat(object, layers= "counts", dimreducs=c("pca", "umap"))
+
     return(object)
 }
-
 
 # Define cell type mappings for each object
 blood_mappings <- list(
@@ -94,13 +95,12 @@ Idents(fat_object_filter) <- fat_object_filter@meta.data$cell_type
 Idents(kidney_object_filter) <- kidney_object_filter@meta.data$cell_type
 Idents(liver_object_filter) <- liver_object_filter@meta.data$cell_type
 
+#### 4. Convert ensembl ids to gene names and remove duplicates ####
 
-#### 5. Convert ensembl ids to gene names and remove duplicates ####
-
-# Extract feature names and Ensembl IDs
+# Extract feature names and Ensembl IDs, filtering out gene names matching the regex
 features <- data.frame(
     gene_name = gsub("_ENSG[0-9]+", "", as.character(blood_object_filter@assays$RNA@meta.features$feature_name)),
-    ensembl_id = as.character(blood_object_filter@assays$RNA@counts@Dimnames[[1]])
+    ensembl_id = as.character(rownames(blood_object_filter))
 )
 
 # Identify duplicate gene names
@@ -109,15 +109,22 @@ duplicates <- features[duplicated(features$gene_name) | duplicated(features$gene
 # Get unique Ensembl IDs of duplicates
 genes_to_exclude <- unique(duplicates$ensembl_id)
 
-# Filter out the duplicate genes from the count matrix
-keep_genes <- !blood_object_filter@assays$RNA@counts@Dimnames[[1]] %in% genes_to_exclude
+# Exclude duplicates
+keep_genes <- !rownames(blood_object_filter) %in% genes_to_exclude
 
 # Function to update gene names and filter the expression matrix
 update_gene_names_and_filter <- function(object, keep_genes, features) {
-    object@assays$RNA@counts <- object@assays$RNA@counts[keep_genes, ]
-    object@assays$RNA@data <- object@assays$RNA@counts[keep_genes, ]
-    object@assays$RNA@counts@Dimnames[[1]] <- features$gene_name[keep_genes]
-    object@assays$RNA@data@Dimnames[[1]] <- features$gene_name[keep_genes]
+
+    # Update gene names and filter duplicates
+    filtered_counts <- object@assays$RNA@counts[keep_genes, ]
+    rownames(filtered_counts) <- features$gene_name[keep_genes]
+
+    # Filter out rows with ENSG gene names
+    filtered_counts <- filtered_counts[!grepl("^ENSG[0-9]+(\\.[0-9]+)?$", rownames(filtered_counts)), ]
+
+    # Update the object's counts
+    object@assays$RNA@counts <- filtered_counts
+
     return(object)
 }
 
@@ -139,7 +146,8 @@ saveRDS(liver_object_filter, "liver_filter.rds")
 
 
 
-#### 4. Batch correction ####   note that kidney is not included, as this tissue only has one donor
+#### 5. Batch correction ####
+# note that kidney is not included, as this tissue only has one donor
 
 sce_blood <- Seurat::as.SingleCellExperiment(blood_object_filter)
 sce_lung <- Seurat::as.SingleCellExperiment(lung_object_filter)
@@ -181,7 +189,6 @@ saveRDS(batch_lung_obj, file = "lung_filter_batch.rds")
 saveRDS(batch_fat_obj, file = "fat_filter_batch.rds")
 saveRDS(batch_liver_obj, file = "liver_filter_batch.rds")
 
-
 # Ensure the corrected matrix is assigned to RNA counts in Seurat
 update_counts_with_combatseq <- function(sce_object, seurat_object, tissue_name) {
     if ("ComBatSeq" %in% assayNames(sce_object)) {
@@ -198,9 +205,8 @@ batch_fat_obj <- update_counts_with_combatseq(sce_fat, batch_fat_obj, "fat")
 batch_liver_obj <- update_counts_with_combatseq(sce_liver, batch_liver_obj, "liver")
 
 
-#### 5. Save preprocessed data ####
+#### 6. Save preprocessed data ####
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
-
 
 cat("Overwrite batch corrected seurat object at", format(Sys.time()), "\n\n", file = progress_file, append = TRUE)
 saveRDS(batch_blood_obj, file = "blood_filter_batch.rds")

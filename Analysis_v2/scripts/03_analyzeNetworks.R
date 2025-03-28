@@ -17,7 +17,7 @@ library(fgsea)
 library(Matrix)
 library(dplyr)
 library(stringr)
-library(scales)
+library(Seurat)
 # library(biomaRt)
 
 # Set working directory
@@ -158,7 +158,6 @@ msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "M
 msigdb_BP <- split(msigdb_BP$gene_symbol, msigdb_BP$gs_name)
 msigdb_MF <- split(msigdb_MF$gene_symbol, msigdb_MF$gs_name)
 
-
 gsea_results <- list()
 
 options(warn = 1)
@@ -186,7 +185,6 @@ for (comp in names(residuals_list)) {
     )
 }
 
-
 # Function to get top up and down pathways
 get_top_pathways <- function(gsea_result) {
     sig_pathways <- gsea_result %>%
@@ -213,7 +211,6 @@ get_top_pathways <- function(gsea_result) {
 
     return(list(up = topPathwaysUp, down = topPathwaysDown))
 }
-
 
 # Function to plot top pathways
 plot_top_pathways <- function(topPathways, comparison_name) {
@@ -278,6 +275,42 @@ for (comp in names(gsea_results)) {
 
 
 
+#### 5. Run GSEA on expression data ####
+
+setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
+
+blood_object <- readRDS("output/preprocessing/blood_filter.rds")
+Idents(blood_object) <- "cell_type"
+lung_object <- readRDS("output/preprocessing/lung_filter.rds")
+Idents(lung_object) <- "cell_type"
+
+##### Calculate sum of expression for each gene in each cell type #####
+blood_sum_exp <- Seurat::AggregateExpression(blood_object)[[1]]
+lung_sum_exp <- Seurat::AggregateExpression(lung_object)[[1]]
+
+colnames(blood_sum_exp) <- paste0("blood_", colnames(blood_sum_exp))
+colnames(lung_sum_exp) <- paste0("lung_", colnames(lung_sum_exp))
+combined_exp_matrix <- merge(blood_sum_exp, lung_sum_exp, by = "row.names", all = TRUE)
+colnames(combined_exp_matrix)[1] <- "gene"
+cor_exp_matrix <- cor(combined_exp_matrix[, -1])
+
+##### Calculate residuals for each comparison #####
+gex_residuals <- list()
+gex_fit <- list()
+gex_plot <- list()
+for (comp in comparisons) {
+    cat("Calculating gex residuals for:", comp$name, "\n")
+    result <- calculate_residuals(combined_exp_matrix, comp$x, comp$y)
+    gex_residuals[[comp$name]] <- result$residuals
+    gex_fit[[comp$name]] <- result$fit
+    gex_plot[[comp$name]] <- plot_linear_regression(combined_exp_matrix, comp$x, comp$y, comp$name, result$residuals)
+}
+
+table(stringr::str_extract(names(gex_residuals[[5]]), "ENSG[0-9]+.[0-9]+"))
+
+table(grepl("ENSG[0-9]+.[0-9]+", names(gex_residuals[[5]])))
+
+table(grepl("^ENSG[0-9]+\\.[0-9]+$", names(gex_residuals[[5]])))
 
 
 
@@ -289,12 +322,7 @@ for (comp in names(gsea_results)) {
 
 
 
-
-
-
-
-
-##### plot gsea test
+#### GSEA testing stuff ####
 
 # Extract the first pathway name
 first_pathway <- gsea_results[[1]]$pathway[1]
@@ -309,8 +337,6 @@ plotEnrichment(
     stats = ranked_genes
 ) + labs(title = paste("Enrichment Plot:", first_pathway))
 
-
-
 top_genes <- names(residuals_list[[7]])[1:1000] # Take the top 1000 most deviated genes
 neg_genes <- names(rev(residuals_list[[7]]))[1:1000]
 
@@ -324,7 +350,6 @@ length(missing_top_genes) # How many top genes are missing?
 length(missing_neg_genes) # How many bottom genes are missing?
 head(missing_top_genes) # See which ones
 head(missing_neg_genes) # See which ones
-
 
 library(biomaRt)
 

@@ -110,6 +110,10 @@ keep_genes <- !rownames(blood_object_filter) %in% genes_to_exclude
 # Function to update gene names and filter the expression matrix
 update_gene_names_and_filter <- function(object, keep_genes, features) {
 
+    # Subset genes that are not mitochondrial
+    non_mt_genes <- !object@assays$RNA@meta.features$mt
+    keep_genes <- keep_genes & non_mt_genes
+
     # Update gene names and filter duplicates
     filtered_counts <- blood_object_filter@assays$RNA@counts[keep_genes, ]
     rownames(filtered_counts) <- features$gene_name[keep_genes]

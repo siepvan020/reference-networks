@@ -115,7 +115,7 @@ update_gene_names_and_filter <- function(object, keep_genes, features) {
     keep_genes <- keep_genes & non_mt_genes
 
     # Update gene names and filter duplicates
-    filtered_counts <- blood_object_filter@assays$RNA@counts[keep_genes, ]
+    filtered_counts <- object@assays$RNA@counts[keep_genes, ]
     rownames(filtered_counts) <- features$gene_name[keep_genes]
     rownames(filtered_counts) <- gsub("\\.[0-9]+$", "", rownames(filtered_counts))
 

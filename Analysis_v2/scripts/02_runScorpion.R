@@ -11,16 +11,23 @@ cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
 options(repos = c(CRAN = "https://cran.r-project.org"))
 
 # Install required packages
+if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+if (!requireNamespace("Matrix", quietly = TRUE)) remotes::install_version("Matrix", version = "1.6.4")
+install.packages("SeuratObject")
+if (!requireNamespace("SeuratObject", quietly = TRUE)) remotes::install_version("SeuratObject", "5.2.0", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
+if (!requireNamespace("Seurat", quietly = TRUE)) remotes::install_version("Seurat", "5.2.0", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
 if (!requireNamespace("Seurat", quietly = TRUE)) install.packages("Seurat")
 if (!requireNamespace("SCORPION", quietly = TRUE)) install.packages("SCORPION")
 if (!requireNamespace("doParallel", quietly = TRUE)) install.packages("doParallel")
-if (!requireNamespace("Matrix", quietly = TRUE)) install.packages("Matrix")
 
 # Load required packages
+library(remotes)
 library(Seurat)
+library(SeuratObject)
 library(SCORPION)
 library(doParallel)
 library(Matrix)
+
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
@@ -38,9 +45,9 @@ load_seurat_object <- function(file_path) {
 # Load Seurat objects
 blood_object <- load_seurat_object("output/preprocessing/blood_filter.rds")
 lung_object <- load_seurat_object("output/preprocessing/lung_filter.rds")
-fat_object <- load_seurat_object("output/preprocessing/fat_filter.rds")
-kidney_object <- load_seurat_object("output/preprocessing/kidney_filter.rds")
-liver_object <- load_seurat_object("output/preprocessing/liver_filter.rds")
+# fat_object <- load_seurat_object("output/preprocessing/fat_filter.rds")
+# kidney_object <- load_seurat_object("output/preprocessing/kidney_filter.rds")
+# liver_object <- load_seurat_object("output/preprocessing/liver_filter.rds")
 
 cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
@@ -120,19 +127,19 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
 }
 
 # Run SCORPION for blood
-run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput.Rdata")
+run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput2.Rdata")
 
 # Run SCORPION for lung
-run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput.Rdata")
+run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput2.Rdata")
 
-# Run SCORPION for fat
-run_scorpion("fat", fat_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "adipose_stem_cell"), "output/networks/final/fatScorpionOutput.Rdata")
+# # Run SCORPION for fat
+# run_scorpion("fat", fat_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "adipose_stem_cell"), "output/networks/final/fatScorpionOutput.Rdata")
 
-# Run SCORPION for kidney
-run_scorpion("kidney", kidney_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "kidney_epithelial_cell"), "output/networks/final/kidneyScorpionOutput.Rdata")
+# # Run SCORPION for kidney
+# run_scorpion("kidney", kidney_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "kidney_epithelial_cell"), "output/networks/final/kidneyScorpionOutput.Rdata")
 
-# Run SCORPION for liver
-run_scorpion("liver", liver_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "hepatocyte"), "output/networks/final/liverScorpionOutput.Rdata")
+# # Run SCORPION for liver
+# run_scorpion("liver", liver_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "hepatocyte"), "output/networks/final/liverScorpionOutput.Rdata")
 
 # Stop parallel processing
 stopCluster(cl)

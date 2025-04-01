@@ -1,6 +1,11 @@
 #!/usr/bin/env Rscript
 
+
+if (!requireNamespace("SeuratObject", quietly = TRUE)) remotes::install_version("SeuratObject", "4.1.4", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
+if (!requireNamespace("Seurat", quietly = TRUE)) remotes::install_version("Seurat", "4.4.0", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
+
 library(Seurat)
+library(SeuratObject)
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data")
@@ -20,23 +25,18 @@ tf <- read.delim("priors/motif_prior_names_2024.tsv", header = FALSE, sep = "\t"
 
 # Function to merge cell types into a new label
 merge_cell_types <- function(object, cell_type_mappings) {
-    # object <- Seurat::DietSeurat(object, layers="counts", dimreducs=c("pca", "umap"))
+    object <- Seurat::DietSeurat(object, dimreducs = c("pca", "umap"))
 
-    idents.df <- data.frame("cell_type" = object$cell_type, "donor_id" = object$donor_id)
-    object_sub <- CreateSeuratObject(counts = LayerData(object, assay = "RNA", layer = "counts"), project = "Tabula Sapiens reference networks", meta.data = object@meta.data)
-    object_sub@assays$RNA@meta.features <- object@assays$RNA@meta.features
-
-    object_sub@meta.data$cell_type <- as.character(object_sub@meta.data$cell_type)
+    object@meta.data$cell_type <- as.character(object@meta.data$cell_type)
 
     for (new_label in names(cell_type_mappings)) {
         old_labels <- cell_type_mappings[[new_label]]
-        # object@meta.data$cell_type <- as.character(object@meta.data$cell_type)
-        object_sub@meta.data$cell_type[object_sub@meta.data$cell_type %in% old_labels] <- new_label
+        object@meta.data$cell_type[object@meta.data$cell_type %in% old_labels] <- new_label
     }
-    object_sub@meta.data$cell_type <- as.factor(object_sub@meta.data$cell_type)
-    Idents(object_sub) <- "cell_type"
+    object@meta.data$cell_type <- as.factor(object@meta.data$cell_type)
+    Idents(object) <- "cell_type"
 
-    return(object_sub)
+    return(object)
 }
 
 # Define cell type mappings for each object
@@ -120,36 +120,29 @@ update_gene_names_and_filter <- function(object, keep_genes, features) {
 
     # Subset genes that are not mitochondrial
     non_mt_genes <- !object@assays$RNA@meta.features$mt
-    keep_genes <- keep_genes & non_mt_genes
+    keep_genes <- non_mt_genes & keep_genes
 
     # Update gene names and filter duplicates
-    filtered_counts <- object[["RNA"]]$counts[keep_genes, ]
-    rownames(filtered_counts) <- features$gene_name[keep_genes]
-    rownames(filtered_counts) <- gsub("\\.[0-9]+$", "", rownames(filtered_counts))
+    filtered_object <- object[keep_genes, ]
 
-    # Filter out rows with ENSG gene names
-    # filtered_counts <- filtered_counts[!grepl("^ENSG[0-9]+(\\.[0-9]+)?$", rownames(filtered_counts)), ]
+    # List of new gene names
+    new_names <- gsub("\\.[0-9]+$", "", features$gene_name[keep_genes])
 
-    # Only take the intersect between priors and gex genes
-    common_genes <- intersect(rownames(filtered_counts), unique(tf$V2))
-    filtered_counts <- filtered_counts[common_genes, ]
+    assayobj <- filtered_object@assays$RNA
+    rownames(assayobj@meta.features) <- new_names
 
-    # Update the object's counts
-    object[["RNA"]]$counts <- filtered_counts
+    matrix_n <- SeuratObject::GetAssayData(assayobj)
 
-    # object[["RNA"]] <- Seurat::CreateAssayObject(counts = object[["RNA"]]@counts)
+    matrix_n@Dimnames[[1]] <- new_names
 
-    # object[["RNA"]]$data <- Seurat::NormalizeData(object[["RNA"]]$counts)
+    assayobj@counts <- matrix_n
+    assayobj@data <- matrix_n
 
-    # Ensure the data layer contains the same genes as the counts layer
-    # filtered_data <- object@assays$RNA@data[rownames(filtered_counts), , drop = FALSE]
-    # object[["RNA"]]$data <- NULL#filtered_data
+    object@assays[["RNA"]] <- assayobj
 
     return(object)
 }
 
-#
-#
 # Apply the function to each object
 blood_object_filter <- update_gene_names_and_filter(blood_object_filter, keep_genes, features)
 lung_object_filter <- update_gene_names_and_filter(lung_object_filter, keep_genes, features)
@@ -165,76 +158,3 @@ saveRDS(lung_object_filter, "lung_filter.rds")
 saveRDS(fat_object_filter, "fat_filter.rds")
 saveRDS(kidney_object_filter, "kidney_filter.rds")
 saveRDS(liver_object_filter, "liver_filter.rds")
-
-
-
-
-#### 5. Batch correction ####
-# note that kidney is not included, as this tissue only has one donor
-
-# sce_blood <- Seurat::as.SingleCellExperiment(blood_object_filter)
-# sce_lung <- Seurat::as.SingleCellExperiment(lung_object_filter)
-# sce_fat <- Seurat::as.SingleCellExperiment(fat_object_filter)
-# sce_liver <- Seurat::as.SingleCellExperiment(liver_object_filter)
-
-# cat("Run ComBatSeq on blood", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-# sce_blood <- singleCellTK::runComBatSeq(sce_blood, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
-
-# cat("Run ComBatSeq on lung", format(Sys.time()), "\n\n", file = progress_file, append = TRUE)
-# sce_lung <- singleCellTK::runComBatSeq(sce_lung, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
-
-# cat("Run ComBatSeq on fat", format(Sys.time()), "\n\n", file = progress_file, append = TRUE)
-# sce_fat <- singleCellTK::runComBatSeq(sce_fat, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
-
-# cat("Run ComBatSeq on liver", format(Sys.time()), "\n\n", file = progress_file, append = TRUE)
-# sce_liver <- singleCellTK::runComBatSeq(sce_liver, useAssay = "counts", batch = "donor_id", assayName = "ComBatSeq")
-
-# cat("Assays in SCE Blood:", assayNames(sce_blood), "\n", file = progress_file, append = TRUE)
-# cat("Assays in SCE Lung:", assayNames(sce_lung), "\n\n", file = progress_file, append = TRUE)
-# cat("Assays in SCE Fat:", assayNames(sce_fat), "\n\n", file = progress_file, append = TRUE)
-# cat("Assays in SCE Liver:", assayNames(sce_liver), "\n\n", file = progress_file, append = TRUE)
-
-# cat("Save SCE objects at", format(Sys.time()), "\n\n\n", file = progress_file, append = TRUE)
-# saveRDS(sce_blood, file = "blood_sce.rds")
-# saveRDS(sce_lung, file = "lung_sce.rds")
-# saveRDS(sce_fat, file = "fat_sce.rds")
-# saveRDS(sce_liver, file = "liver_sce.rds")
-
-# cat("Convert objects back to Seurat at", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-# batch_blood_obj <- as.Seurat(sce_blood)
-# batch_lung_obj <- as.Seurat(sce_lung)
-# batch_fat_obj <- as.Seurat(sce_fat)
-# batch_liver_obj <- as.Seurat(sce_liver)
-
-# cat("Save batch corrected seurat object at", format(Sys.time()), "\n\n\n", file = progress_file, append = TRUE)
-# saveRDS(batch_blood_obj, file = "blood_filter_batch.rds")
-# saveRDS(batch_lung_obj, file = "lung_filter_batch.rds")
-# saveRDS(batch_fat_obj, file = "fat_filter_batch.rds")
-# saveRDS(batch_liver_obj, file = "liver_filter_batch.rds")
-
-# # Ensure the corrected matrix is assigned to RNA counts in Seurat
-# update_counts_with_combatseq <- function(sce_object, seurat_object, tissue_name) {
-#     if ("ComBatSeq" %in% assayNames(sce_object)) {
-#         seurat_object@assays$RNA@counts <- assay(sce_object, "ComBatSeq")
-#     } else {
-#         cat(paste("Warning: ComBatSeq assay missing in SCE", tissue_name, "object!\n"), file = progress_file, append = TRUE)
-#     }
-#     return(seurat_object)
-# }
-
-# batch_blood_obj <- update_counts_with_combatseq(sce_blood, batch_blood_obj, "blood")
-# batch_lung_obj <- update_counts_with_combatseq(sce_lung, batch_lung_obj, "lung")
-# batch_fat_obj <- update_counts_with_combatseq(sce_fat, batch_fat_obj, "fat")
-# batch_liver_obj <- update_counts_with_combatseq(sce_liver, batch_liver_obj, "liver")
-
-
-# #### 6. Save preprocessed data ####
-# setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
-
-# cat("Overwrite batch corrected seurat object at", format(Sys.time()), "\n\n", file = progress_file, append = TRUE)
-# saveRDS(batch_blood_obj, file = "blood_filter_batch.rds")
-# saveRDS(batch_lung_obj, file = "lung_filter_batch.rds")
-# saveRDS(batch_fat_obj, file = "fat_filter_batch.rds")
-# saveRDS(batch_liver_obj, file = "liver_filter_batch.rds")
-
-# cat("Saved filtered, batch corrected objects at", format(Sys.time()), "\n", file = progress_file, append = TRUE)

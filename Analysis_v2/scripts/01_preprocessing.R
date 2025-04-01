@@ -20,20 +20,23 @@ tf <- read.delim("priors/motif_prior_names_2024.tsv", header = FALSE, sep = "\t"
 
 # Function to merge cell types into a new label
 merge_cell_types <- function(object, cell_type_mappings) {
-    # blood_object@meta.data$cell_type <- as.character(blood_object@meta.data$cell_type)
-    # object@assays$RNA@data <- NULL
-    # for (new_label in names(cell_type_mappings)) {
-    #     old_labels <- cell_type_mappings[[new_label]]
-    #     object@meta.data$cell_type[object@meta.data$cell_type %in% old_labels] <- new_label
-    # }
-
     # object <- Seurat::DietSeurat(object, layers="counts", dimreducs=c("pca", "umap"))
 
-    idents.df = data.frame("cell_type" = object$cell_type, "donor_id" = object$donor_id)
-    export = CreateSeuratObject(counts = LayerData(object, assay = "RNA", layer = "counts"), meta.data = idents.df)
+    idents.df <- data.frame("cell_type" = object$cell_type, "donor_id" = object$donor_id)
+    object_sub <- CreateSeuratObject(counts = LayerData(object, assay = "RNA", layer = "counts"), project = "Tabula Sapiens reference networks", meta.data = object@meta.data)
+    object_sub@assays$RNA@meta.features <- object@assays$RNA@meta.features
 
+    object_sub@meta.data$cell_type <- as.character(object_sub@meta.data$cell_type)
 
-    return(object)
+    for (new_label in names(cell_type_mappings)) {
+        old_labels <- cell_type_mappings[[new_label]]
+        # object@meta.data$cell_type <- as.character(object@meta.data$cell_type)
+        object_sub@meta.data$cell_type[object_sub@meta.data$cell_type %in% old_labels] <- new_label
+    }
+    object_sub@meta.data$cell_type <- as.factor(object_sub@meta.data$cell_type)
+    Idents(object_sub) <- "cell_type"
+
+    return(object_sub)
 }
 
 # Define cell type mappings for each object
@@ -133,7 +136,7 @@ update_gene_names_and_filter <- function(object, keep_genes, features) {
 
     # Update the object's counts
     object[["RNA"]]$counts <- filtered_counts
-    
+
     # object[["RNA"]] <- Seurat::CreateAssayObject(counts = object[["RNA"]]@counts)
 
     # object[["RNA"]]$data <- Seurat::NormalizeData(object[["RNA"]]$counts)

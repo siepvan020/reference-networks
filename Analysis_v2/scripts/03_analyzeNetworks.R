@@ -150,12 +150,15 @@ ggsave("linear_regression/tissue_specific_linear.pdf", plot_list[[7]], width = 1
 #### 4. Run GSEA on ranked residuals ####
 
 # Load gene sets for GO:BP and GO:MF using gene symbols
-msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")[, c("gs_name", "gene_symbol")]
-msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "MF")[, c("gs_name", "gene_symbol")]
+msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")[, c("gs_name", "gene_symbol", "ensembl_gene")]
+msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "MF")[, c("gs_name", "gene_symbol", "ensembl_gene")]
 
 # Convert to fgsea-compatible format (list of gene sets)
 msigdb_BP <- split(msigdb_BP$gene_symbol, msigdb_BP$gs_name)
 msigdb_MF <- split(msigdb_MF$gene_symbol, msigdb_MF$gs_name)
+
+msigdb_BP_combined <- split(c(msigdb_BP$gene_symbol, msigdb_BP$ensembl_gene), msigdb_BP$gs_name)
+
 
 gsea_results <- list()
 

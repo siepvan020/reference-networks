@@ -6,6 +6,10 @@ if (!requireNamespace("Seurat", quietly = TRUE)) remotes::install_version("Seura
 
 library(Seurat)
 library(SeuratObject)
+library(biomaRt)
+library(dplyr)
+library(ggplot2)
+
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data")
@@ -89,7 +93,6 @@ cells_to_keep_fat <- rownames(fat_object@meta.data[fat_object@meta.data$cell_typ
 cells_to_keep_kidney <- rownames(kidney_object@meta.data[kidney_object@meta.data$cell_type %in% append(common_celltypes, "kidney_epithelial_cell"), ])
 cells_to_keep_liver <- rownames(liver_object@meta.data[liver_object@meta.data$cell_type %in% append(common_celltypes, "hepatocyte"), ])
 
-
 # Apply filtering
 blood_object_filter <- blood_object[, cells_to_keep_blood]
 lung_object_filter <- lung_object[, cells_to_keep_lung]
@@ -98,7 +101,94 @@ kidney_object_filter <- kidney_object[, cells_to_keep_kidney]
 liver_object_filter <- liver_object[, cells_to_keep_liver]
 
 
-#### 4. Convert ensembl ids to gene names and remove duplicates ####
+#### 4. Plot gene expression scatter plot for each tissue ####
+
+# Connect to Ensembl
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+# Function to retrieve gene biotypes and prepare data for plotting
+get_gene_biotypes <- function(object_filter) {
+    gene_totals <- rowSums(object_filter)
+    df <- data.frame(
+        gene = rownames(object_filter),
+        sum_exp = gene_totals,
+        stringsAsFactors = FALSE
+    )
+    df$ENSG <- grepl("^ENSG", df$gene)
+
+    # Connect to Ensembl
+    ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+    # Get gene biotypes for non-ensg genes
+    gene_annotations <- getBM(
+        attributes = c("external_gene_name", "gene_biotype"),
+        filters = "external_gene_name",
+        values = df$gene[!df$ENSG],
+        mart = ensembl
+    )
+
+    # Merge annotation with our data frame
+    df <- left_join(df, gene_annotations, by = c("gene" = "external_gene_name"))
+
+    # For ENSG genes, assign a custom label (here, "ENSG")
+    df$gene_biotype <- ifelse(df$ENSG, "ENSG", df$gene_biotype)
+    df$gene_biotype[is.na(df$gene_biotype)] <- "other" # in case any remain NA
+
+    # Create a grouping variable for ENSG genes (custom label), protein_coding, lncRNA, other (any gene not falling in above)
+    df$group <- ifelse(df$gene_biotype %in% c("protein_coding", "lncRNA"),
+        df$gene_biotype, df$gene_biotype
+    )
+    # For clarity, ENSG remains "ENSG" and any remaining labels become "other"
+    df$group[!(df$group %in% c("ENSG", "protein_coding", "lncRNA"))] <- "other"
+
+    return(df)
+}
+
+# Function to generate gene expression scatter plot for a given tissue
+generate_gene_expression_plot <- function(df, tissue_name) {
+    # Define colors for each group (choose colors as you prefer)
+    group_colors <- c("ENSG" = "red", "protein_coding" = "blue", "lncRNA" = "green", "other" = "black")
+
+    # Plot the gene totals, coloring by the group
+    p <- ggplot(df, aes(x = gene, y = sum_exp, color = group)) +
+        geom_point() +
+        scale_color_manual(values = group_colors) +
+        labs(
+            title = paste("Total Gene Expression Across All Cells -", tissue_name),
+            x = "Gene",
+            y = "Sum of expression"
+        ) +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+    return(p)
+}
+
+# Retrieve gene biotypes and save to a named list
+gene_df <- list(
+    blood = get_gene_biotypes(blood_object_filter),
+    lung = get_gene_biotypes(lung_object_filter),
+    fat = get_gene_biotypes(fat_object_filter),
+    kidney = get_gene_biotypes(kidney_object_filter),
+    liver = get_gene_biotypes(liver_object_filter)
+)
+
+# Generate plots for all tissues
+gex_plots <- list(
+    blood = generate_gene_expression_plot(gene_df$blood, "blood"),
+    lung = generate_gene_expression_plot(gene_df$lung, "lung"),
+    fat = generate_gene_expression_plot(gene_df$fat, "fat"),
+    kidney = generate_gene_expression_plot(gene_df$kidney, "kidney"),
+    liver = generate_gene_expression_plot(gene_df$liver, "liver")
+)
+
+# Save all plots to a single PDF
+pdf("all_tissues_raw_exp_scatter.pdf", width = 10, height = 5)
+for (plot in gex_plots) {
+    print(plot)
+}
+dev.off()
+
+
+#### 5. Convert ensembl ids to gene names and remove duplicates ####
 
 # Extract feature names and Ensembl IDs, filtering out gene names matching the regex
 features <- data.frame(
@@ -121,6 +211,9 @@ update_gene_names_and_filter <- function(object, keep_genes, features) {
     # Subset genes that are not mitochondrial
     non_mt_genes <- !object@assays$RNA@meta.features$mt
     keep_genes <- non_mt_genes & keep_genes
+
+    # Set the first half of keep_genes to TRUE and the other half to FALSE for testing purposes
+    # keep_genes[(floor(length(keep_genes) / 2) + 1):length(keep_genes)] <- FALSE
 
     # Update gene names and filter duplicates
     filtered_object <- object[keep_genes, ]
@@ -158,3 +251,18 @@ saveRDS(lung_object_filter, "lung_filter.rds")
 saveRDS(fat_object_filter, "fat_filter.rds")
 saveRDS(kidney_object_filter, "kidney_filter.rds")
 saveRDS(liver_object_filter, "liver_filter.rds")
+
+
+
+
+# amount of genes with non-zero expression across cells (tissue-specific)
+# > length(rownames(blood_object_filter[rowSums(blood_object_filter) > 0, ]))
+# [1] 56055
+# > length(rownames(lung_object_filter[rowSums(lung_object_filter) > 0, ]))
+# [1] 51646
+# > length(rownames(liver_object_filter[rowSums(liver_object_filter) > 0, ]))
+# [1] 43511
+# > length(rownames(fat_object_filter[rowSums(fat_object_filter) > 0, ]))
+# [1] 45310
+# > length(rownames(kidney_object_filter[rowSums(kidney_object_filter) > 0, ]))
+# [1] 45654

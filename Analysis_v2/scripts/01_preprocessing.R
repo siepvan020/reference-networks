@@ -101,7 +101,60 @@ kidney_object_filter <- kidney_object[, cells_to_keep_kidney]
 liver_object_filter <- liver_object[, cells_to_keep_liver]
 
 
-#### 4. Plot gene expression scatter plot for each tissue ####
+#### 4. Convert ensembl ids to gene names and remove duplicates ####
+
+# Extract feature names and Ensembl IDs, filtering out gene names matching the regex
+features <- data.frame(
+    gene_name = gsub("_ENSG[0-9]+", "", as.character(blood_object_filter@assays$RNA@meta.features$feature_name)),
+    ensembl_id = as.character(rownames(blood_object_filter))
+)
+
+# Identify duplicate gene names
+duplicates <- features[duplicated(features$gene_name) | duplicated(features$gene_name, fromLast = TRUE), ]
+
+# Get unique Ensembl IDs of duplicates
+genes_to_exclude <- unique(duplicates$ensembl_id)
+
+# Exclude duplicates
+keep_genes <- !rownames(blood_object_filter) %in% genes_to_exclude
+
+# Function to update gene names and filter the expression matrix
+update_gene_names_and_filter <- function(object, keep_genes, features) {
+
+    # Subset genes that are not mitochondrial
+    non_mt_genes <- !object@assays$RNA@meta.features$mt
+    keep_genes <- non_mt_genes & keep_genes
+
+    # Update gene names and filter duplicates
+    filtered_object <- object[keep_genes, ]
+
+    # List of new gene names
+    new_names <- gsub("\\.[0-9]+$", "", features$gene_name[keep_genes])
+
+    assayobj <- filtered_object@assays$RNA
+    rownames(assayobj@meta.features) <- new_names
+
+    matrix_n <- SeuratObject::GetAssayData(assayobj)
+
+    matrix_n@Dimnames[[1]] <- new_names
+
+    assayobj@counts <- matrix_n
+    assayobj@data <- matrix_n
+
+    object@assays[["RNA"]] <- assayobj
+
+    return(object)
+}
+
+# Apply the function to each object
+blood_object_filter <- update_gene_names_and_filter(blood_object_filter, keep_genes, features)
+lung_object_filter <- update_gene_names_and_filter(lung_object_filter, keep_genes, features)
+fat_object_filter <- update_gene_names_and_filter(fat_object_filter, keep_genes, features)
+kidney_object_filter <- update_gene_names_and_filter(kidney_object_filter, keep_genes, features)
+liver_object_filter <- update_gene_names_and_filter(liver_object_filter, keep_genes, features)
+
+
+#### 5. Plot gene expression scatter plot for each tissue ####
 
 # Connect to Ensembl
 ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
@@ -134,11 +187,11 @@ get_gene_biotypes <- function(object_filter) {
     df$gene_biotype[is.na(df$gene_biotype)] <- "other" # in case any remain NA
 
     # Create a grouping variable for ENSG genes (custom label), protein_coding, lncRNA, other (any gene not falling in above)
-    df$group <- ifelse(df$gene_biotype %in% c("protein_coding", "lncRNA"),
+    df$major_group <- ifelse(df$gene_biotype %in% c("protein_coding", "lncRNA"),
         df$gene_biotype, df$gene_biotype
     )
     # For clarity, ENSG remains "ENSG" and any remaining labels become "other"
-    df$group[!(df$group %in% c("ENSG", "protein_coding", "lncRNA"))] <- "other"
+    df$major_group[!(df$major_group %in% c("ENSG", "protein_coding", "lncRNA"))] <- "other"
 
     return(df)
 }
@@ -149,7 +202,7 @@ generate_gene_expression_plot <- function(df, tissue_name) {
     group_colors <- c("ENSG" = "red", "protein_coding" = "blue", "lncRNA" = "green", "other" = "black")
 
     # Plot the gene totals, coloring by the group
-    p <- ggplot(df, aes(x = gene, y = sum_exp, color = group)) +
+    p <- ggplot(df, aes(x = gene, y = sum_exp, color = major_group)) +
         geom_point() +
         scale_color_manual(values = group_colors) +
         labs(
@@ -188,60 +241,6 @@ for (plot in gex_plots) {
 dev.off()
 
 
-#### 5. Convert ensembl ids to gene names and remove duplicates ####
-
-# Extract feature names and Ensembl IDs, filtering out gene names matching the regex
-features <- data.frame(
-    gene_name = gsub("_ENSG[0-9]+", "", as.character(blood_object_filter@assays$RNA@meta.features$feature_name)),
-    ensembl_id = as.character(rownames(blood_object_filter))
-)
-
-# Identify duplicate gene names
-duplicates <- features[duplicated(features$gene_name) | duplicated(features$gene_name, fromLast = TRUE), ]
-
-# Get unique Ensembl IDs of duplicates
-genes_to_exclude <- unique(duplicates$ensembl_id)
-
-# Exclude duplicates
-keep_genes <- !rownames(blood_object_filter) %in% genes_to_exclude
-
-# Function to update gene names and filter the expression matrix
-update_gene_names_and_filter <- function(object, keep_genes, features) {
-
-    # Subset genes that are not mitochondrial
-    non_mt_genes <- !object@assays$RNA@meta.features$mt
-    keep_genes <- non_mt_genes & keep_genes
-
-    # Set the first half of keep_genes to TRUE and the other half to FALSE for testing purposes
-    # keep_genes[(floor(length(keep_genes) / 2) + 1):length(keep_genes)] <- FALSE
-
-    # Update gene names and filter duplicates
-    filtered_object <- object[keep_genes, ]
-
-    # List of new gene names
-    new_names <- gsub("\\.[0-9]+$", "", features$gene_name[keep_genes])
-
-    assayobj <- filtered_object@assays$RNA
-    rownames(assayobj@meta.features) <- new_names
-
-    matrix_n <- SeuratObject::GetAssayData(assayobj)
-
-    matrix_n@Dimnames[[1]] <- new_names
-
-    assayobj@counts <- matrix_n
-    assayobj@data <- matrix_n
-
-    object@assays[["RNA"]] <- assayobj
-
-    return(object)
-}
-
-# Apply the function to each object
-blood_object_filter <- update_gene_names_and_filter(blood_object_filter, keep_genes, features)
-lung_object_filter <- update_gene_names_and_filter(lung_object_filter, keep_genes, features)
-fat_object_filter <- update_gene_names_and_filter(fat_object_filter, keep_genes, features)
-kidney_object_filter <- update_gene_names_and_filter(kidney_object_filter, keep_genes, features)
-liver_object_filter <- update_gene_names_and_filter(liver_object_filter, keep_genes, features)
 
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
 

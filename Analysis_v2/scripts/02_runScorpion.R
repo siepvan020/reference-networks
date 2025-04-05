@@ -11,17 +11,17 @@ cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
 options(repos = c(CRAN = "https://cran.r-project.org"))
 
 # Install required packages
-if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
-if (!requireNamespace("Matrix", quietly = TRUE)) remotes::install_version("Matrix", version = "1.6.4")
-install.packages("SeuratObject")
-if (!requireNamespace("SeuratObject", quietly = TRUE)) remotes::install_version("SeuratObject", "5.2.0", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
-if (!requireNamespace("Seurat", quietly = TRUE)) remotes::install_version("Seurat", "5.2.0", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
+# if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+# if (!requireNamespace("Matrix", quietly = TRUE)) remotes::install_version("Matrix", version = "1.6.4")
+# install.packages("SeuratObject")
+# if (!requireNamespace("SeuratObject", quietly = TRUE)) remotes::install_version("SeuratObject", "5.2.0", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
+# if (!requireNamespace("Seurat", quietly = TRUE)) remotes::install_version("Seurat", "5.2.0", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
 if (!requireNamespace("Seurat", quietly = TRUE)) install.packages("Seurat")
 if (!requireNamespace("SCORPION", quietly = TRUE)) install.packages("SCORPION")
 if (!requireNamespace("doParallel", quietly = TRUE)) install.packages("doParallel")
+if (!requireNamespace("Matrix", quietly = TRUE)) install.packages("Matrix")
 
 # Load required packages
-library(remotes)
 library(Seurat)
 library(SeuratObject)
 library(SCORPION)
@@ -91,7 +91,8 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
                     tfMotifs = scorpion_input$tf,
                     gexMatrix = scorpion_input$gex,
                     ppiNet = scorpion_input$ppi,
-                    alphaValue = 0.1
+                    alphaValue = 0.1,
+                    outNet = c("regulatory")
                 )
             },
             error = function(e) {

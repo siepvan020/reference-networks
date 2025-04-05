@@ -22,8 +22,6 @@ fat_object <- readRDS("rds/TS_v2_Fat.rds")
 kidney_object <- readRDS("rds/TS_v2_Kidney.rds")
 liver_object <- readRDS("rds/TS_v2_Liver.rds")
 
-tf <- read.delim("priors/motif_prior_names_2024.tsv", header = FALSE, sep = "\t")
-
 
 #### 2. Correct cell type annotations ####
 
@@ -123,25 +121,31 @@ update_gene_names_and_filter <- function(object, keep_genes, features) {
 
     # Subset genes that are not mitochondrial
     non_mt_genes <- !object@assays$RNA@meta.features$mt
-    keep_genes <- non_mt_genes & keep_genes
+    non_ensg_genes <- !grepl("^ENSG", features$gene_name)
+    keep_genes <- keep_genes & non_mt_genes & non_ensg_genes
 
     # Update gene names and filter duplicates
     filtered_object <- object[keep_genes, ]
 
-    # List of new gene names
-    new_names <- gsub("\\.[0-9]+$", "", features$gene_name[keep_genes])
-
     assayobj <- filtered_object@assays$RNA
+
+    # List of new gene names
+    new_names <- features$gene_name[keep_genes]
+
+    # Assign new names to the features slot of the temporary object
     rownames(assayobj@meta.features) <- new_names
 
     matrix_n <- SeuratObject::GetAssayData(assayobj)
-
     matrix_n@Dimnames[[1]] <- new_names
 
+    # Assign new gene names to the temporary object
     assayobj@counts <- matrix_n
     assayobj@data <- matrix_n
 
+    # Overwrite the RNA assay of the original object with the updated assay
     object@assays[["RNA"]] <- assayobj
+
+    object <- object[rowSums(object) > 0, ]
 
     return(object)
 }
@@ -239,8 +243,6 @@ for (plot in gex_plots) {
     print(plot)
 }
 dev.off()
-
-
 
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
 

@@ -10,6 +10,7 @@ library(biomaRt)
 library(dplyr)
 library(ggplot2)
 library(harmony)
+library(sva)
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data")
@@ -167,6 +168,23 @@ saveRDS(kidney_object_filter, "kidney_filter.rds")
 saveRDS(liver_object_filter, "liver_filter.rds")
 
 
+#### 5. Batch correction on counts ####
+# Kidney is not included, as this tissue only has one donor
+
+blood_object_batch <- sva::ComBat_seq(as.matrix(blood_object_filter@assays$RNA@counts), batch = blood_object_filter$donor_id)
+lung_object_batch <- sva::ComBat_seq(as.matrix(lung_object_filter@assays$RNA@counts), batch = lung_object_filter$donor_id)
+fat_object_batch <- sva::ComBat_seq(as.matrix(fat_object_filter@assays$RNA@counts), batch = fat_object_filter$donor_id)
+liver_object_batch <- sva::ComBat_seq(as.matrix(liver_object_filter@assays$RNA@counts), batch = liver_object_filter$donor_id)
+# kidney_object_final <- sva::ComBat_seq(as.matrix(kidney_object_filter@assays$RNA@counts), batch = kidney_object_filter$donor_id)
+
+# Save the batch-corrected objects
+saveRDS(blood_object_batch, "blood_batch.rds")
+saveRDS(lung_object_batch, "lung_batch.rds")
+saveRDS(fat_object_batch, "fat_batch.rds")
+saveRDS(liver_object_batch, "liver_batch.rds")
+# saveRDS(kidney_object_batch, "kidney_batch.rds")
+
+
 #### 5. Plot gene expression scatter plot for each tissue ####
 
 # Connect to Ensembl
@@ -228,30 +246,32 @@ generate_gene_expression_plot <- function(df, tissue_name) {
     return(p)
 }
 
-# Retrieve gene biotypes and save to a named list
-gene_df <- list(
-    blood = get_gene_biotypes(blood_object_filter),
-    lung = get_gene_biotypes(lung_object_filter),
-    fat = get_gene_biotypes(fat_object_filter),
-    kidney = get_gene_biotypes(kidney_object_filter),
-    liver = get_gene_biotypes(liver_object_filter)
-)
+if (interactive()) {
+    # Retrieve gene biotypes and save to a named list
+    gene_df <- list(
+        blood = get_gene_biotypes(blood_object_filter),
+        lung = get_gene_biotypes(lung_object_filter),
+        fat = get_gene_biotypes(fat_object_filter),
+        kidney = get_gene_biotypes(kidney_object_filter),
+        liver = get_gene_biotypes(liver_object_filter)
+    )
 
-# Generate plots for all tissues
-gex_plots <- list(
-    blood = generate_gene_expression_plot(gene_df$blood, "blood"),
-    lung = generate_gene_expression_plot(gene_df$lung, "lung"),
-    fat = generate_gene_expression_plot(gene_df$fat, "fat"),
-    kidney = generate_gene_expression_plot(gene_df$kidney, "kidney"),
-    liver = generate_gene_expression_plot(gene_df$liver, "liver")
-)
+    # Generate plots for all tissues
+    gex_plots <- list(
+        blood = generate_gene_expression_plot(gene_df$blood, "blood"),
+        lung = generate_gene_expression_plot(gene_df$lung, "lung"),
+        fat = generate_gene_expression_plot(gene_df$fat, "fat"),
+        kidney = generate_gene_expression_plot(gene_df$kidney, "kidney"),
+        liver = generate_gene_expression_plot(gene_df$liver, "liver")
+    )
 
-# Save all expression plots to a single PDF
-pdf("plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 5)
-for (plot in gex_plots) {
-    print(plot)
+    # Save all expression plots to a single PDF
+    pdf("plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 5)
+    for (plot in gex_plots) {
+        print(plot)
+    }
+    dev.off()
 }
-dev.off()
 
 
 #### 6. Plot batch effect ####
@@ -282,20 +302,22 @@ inspect_batch_effect <- function(object, tissue) {
     return(list(donor_plot = donor_plot, celltype_plot = celltype_plot))
 }
 
-batch_plots <- list(
-    blood = inspect_batch_effect(blood_object_filter, "blood"),
-    lung = inspect_batch_effect(lung_object_filter, "lung"),
-    fat = inspect_batch_effect(fat_object_filter, "fat"),
-    # kidney = inspect_batch_effect(kidney_object_filter, "kidney"),
-    liver = inspect_batch_effect(liver_object_filter, "liver")
-)
+if (interactive()) {
+    batch_plots <- list(
+        blood = inspect_batch_effect(blood_object_filter, "blood"),
+        lung = inspect_batch_effect(lung_object_filter, "lung"),
+        fat = inspect_batch_effect(fat_object_filter, "fat"),
+        # kidney = inspect_batch_effect(kidney_object_filter, "kidney"),
+        liver = inspect_batch_effect(liver_object_filter, "liver")
+    )
 
-# Save all batch effect plots to a single PDF
-pdf("plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
-for (plot in batch_plots) {
-    print(plot)
+    # Save all batch effect plots to a single PDF
+    pdf("plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
+    for (plot in batch_plots) {
+        print(plot)
+    }
+    dev.off()
 }
-dev.off()
 
 
 

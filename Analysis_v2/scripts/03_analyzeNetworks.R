@@ -24,8 +24,8 @@ library(Seurat)
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/networks")
 
 #### 1. Load and format data ####
-load("final/bloodScorpionOutput.Rdata")
-load("final/lungScorpionOutput.Rdata")
+load("final/bloodScorpionOutput2.Rdata")
+load("final/lungScorpionOutput2.Rdata")
 load("final/fatScorpionOutput.Rdata")
 load("final/kidneyScorpionOutput.Rdata")
 load("final/liverScorpionOutput.Rdata")
@@ -52,7 +52,7 @@ liver_indegrees <- calculate_indegrees(liver_output, "liver")
 combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees)) # , fat_indegrees, kidney_indegrees, liver_indegrees))
 
 # Calculate correlation matrix
-cor_indegree_matrix <- cor(combined_indegrees[, -1])
+cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.obs")
 
 # Convert the correlation matrix to a long format for ggplot
 cor_long <- as.data.frame(as.table(cor_indegree_matrix))
@@ -60,7 +60,7 @@ cor_long <- as.data.frame(as.table(cor_indegree_matrix))
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/analysis")
 
 # Plot the one-sided correlation matrix with values in the tiles
-ggsave("correlation/correlation_matrix_indegrees.pdf", ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
+ggsave("correlation/correlation_matrix_indegrees2.pdf", ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
     geom_tile(na.rm = TRUE) +
     geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
     scale_fill_gradient(low = "white", high = "steelblue", name = "Pearson's r value") +
@@ -134,31 +134,29 @@ fit_list <- list()
 plot_list <- list()
 for (comp in comparisons) {
     cat("Calculating residuals for:", comp$name, "\n")
-    result <- calculate_residuals(combined_indegrees, comp$x, comp$y)
+    data <- combined_indegrees[complete.cases(combined_indegrees[[comp$x]], combined_indegrees[[comp$y]]), ] # Only keep complete cases between conditions
+    result <- calculate_residuals(data, comp$x, comp$y)
     residuals_list[[comp$name]] <- result$residuals
     fit_list[[comp$name]] <- result$fit
-    plot_list[[comp$name]] <- plot_linear_regression(combined_indegrees, comp$x, comp$y, comp$name, result$residuals)
+    plot_list[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals)
 }
 
 # Save plots of the linear regression models
-ggsave("linear_regression/immune_cells_between_tissues.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
-ggsave("linear_regression/immune_cells_lung.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
-ggsave("linear_regression/tissue_specific_linear.pdf", plot_list[[7]], width = 12, height = 6)
+ggsave("linear_regression/immune_cells_between_tissues2.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
+ggsave("linear_regression/immune_cells_lung2.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
+ggsave("linear_regression/tissue_specific_linear2.pdf", plot_list[[7]], width = 12, height = 6)
 
 
 
 #### 4. Run GSEA on ranked residuals ####
 
 # Load gene sets for GO:BP and GO:MF using gene symbols
-msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")[, c("gs_name", "gene_symbol", "ensembl_gene")]
-msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "MF")[, c("gs_name", "gene_symbol", "ensembl_gene")]
+msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")[, c("gs_name", "gene_symbol")]
+msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "MF")[, c("gs_name", "gene_symbol")]
 
 # Convert to fgsea-compatible format (list of gene sets)
 msigdb_BP <- split(msigdb_BP$gene_symbol, msigdb_BP$gs_name)
 msigdb_MF <- split(msigdb_MF$gene_symbol, msigdb_MF$gs_name)
-
-msigdb_BP_combined <- split(c(msigdb_BP$gene_symbol, msigdb_BP$ensembl_gene), msigdb_BP$gs_name)
-
 
 gsea_results <- list()
 
@@ -266,17 +264,6 @@ for (comp in names(gsea_results)) {
 }
 
 
-
-# pdf(file = "13_enrichmentPlot_last.pdf", width = 20, height = 15)
-# plotEnrichment(
-#     msigdb_BP[[gsea_results[[13]][order(NES)][2]$pathway]],
-#     ranked_genes
-# ) +
-#     labs(title = gsea_results[[13]][order(NES)][2]$pathway)
-# dev.off()
-
-
-
 #### 5. Run GSEA on expression data ####
 
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
@@ -294,7 +281,7 @@ colnames(blood_sum_exp) <- paste0("blood_", colnames(blood_sum_exp))
 colnames(lung_sum_exp) <- paste0("lung_", colnames(lung_sum_exp))
 combined_exp_matrix <- merge(blood_sum_exp, lung_sum_exp, by = "row.names", all = TRUE)
 colnames(combined_exp_matrix)[1] <- "gene"
-cor_exp_matrix <- cor(combined_exp_matrix[, -1])
+cor_exp_matrix <- cor(combined_exp_matrix[, -1], use = "pairwise.complete.obs")
 
 ##### Calculate residuals for each comparison #####
 gex_residuals <- list()

@@ -1,5 +1,9 @@
 #!/usr/bin/env Rscript
 
+progress_file <- "/div/pythagoras/u1/siepv/siep/Analysis_v2/output/log/preprocess.log"
+
+# Start fresh log or append
+cat("- Starting script at -", format(Sys.time()), "\n", file = progress_file)
 
 if (!requireNamespace("SeuratObject", quietly = TRUE)) remotes::install_version("SeuratObject", "4.1.4", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
 if (!requireNamespace("Seurat", quietly = TRUE)) remotes::install_version("Seurat", "4.4.0", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
@@ -22,6 +26,7 @@ lung_object <- readRDS("rds/TS_v2_Lung.rds")
 fat_object <- readRDS("rds/TS_v2_Fat.rds")
 kidney_object <- readRDS("rds/TS_v2_Kidney.rds")
 liver_object <- readRDS("rds/TS_v2_Liver.rds")
+cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 2. Correct cell type annotations ####
@@ -157,6 +162,7 @@ lung_object_filter <- update_gene_names_and_filter(lung_object_filter, keep_gene
 fat_object_filter <- update_gene_names_and_filter(fat_object_filter, keep_genes, features)
 kidney_object_filter <- update_gene_names_and_filter(kidney_object_filter, keep_genes, features)
 liver_object_filter <- update_gene_names_and_filter(liver_object_filter, keep_genes, features)
+cat("- Filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
 
@@ -166,6 +172,7 @@ saveRDS(lung_object_filter, "lung_filter.rds")
 saveRDS(fat_object_filter, "fat_filter.rds")
 saveRDS(kidney_object_filter, "kidney_filter.rds")
 saveRDS(liver_object_filter, "liver_filter.rds")
+cat("- Saved filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 5. Batch correction on counts ####
@@ -176,13 +183,16 @@ lung_object_batch <- sva::ComBat_seq(as.matrix(lung_object_filter@assays$RNA@cou
 fat_object_batch <- sva::ComBat_seq(as.matrix(fat_object_filter@assays$RNA@counts), batch = fat_object_filter$donor_id)
 liver_object_batch <- sva::ComBat_seq(as.matrix(liver_object_filter@assays$RNA@counts), batch = liver_object_filter$donor_id)
 # kidney_object_final <- sva::ComBat_seq(as.matrix(kidney_object_filter@assays$RNA@counts), batch = kidney_object_filter$donor_id)
+cat("- Batch corrected objects with ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+
 
 # Save the batch-corrected objects
 saveRDS(blood_object_batch, "blood_batch.rds")
 saveRDS(lung_object_batch, "lung_batch.rds")
 saveRDS(fat_object_batch, "fat_batch.rds")
+saveRDS(kidney_object_filter, "kidney_batch.rds")
 saveRDS(liver_object_batch, "liver_batch.rds")
-# saveRDS(kidney_object_batch, "kidney_batch.rds")
+cat("- Saved batch-corrected objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 5. Plot gene expression scatter plot for each tissue ####

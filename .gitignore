@@ -6,6 +6,7 @@
 **/*.h5ad
 **/*.h5seurat
 **/*.pdf
+**/*.log
 
 data/TS_All_Tissues.zip
 data/Tabula_Sapiens_metadata.csv
@@ -15,4 +16,3 @@ Analysis/data/priors/*.tsv
 Analysis_v2/data/priors/motif_prior_names_2024.tsv
 
 Analysis_v2/scripts/sva_preprocessing.R
-Analysis_v2/output/log/sva_preprocess.log

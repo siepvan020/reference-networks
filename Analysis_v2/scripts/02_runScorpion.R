@@ -43,8 +43,8 @@ load_seurat_object <- function(file_path) {
 }
 
 # Load Seurat objects
-blood_object <- load_seurat_object("output/preprocessing/blood_filter.rds")
-lung_object <- load_seurat_object("output/preprocessing/lung_filter.rds")
+blood_object <- load_seurat_object("output/preprocessing/blood_prepped.rds")
+lung_object <- load_seurat_object("output/preprocessing/lung_prepped.rds")
 # fat_object <- load_seurat_object("output/preprocessing/fat_filter.rds")
 # kidney_object <- load_seurat_object("output/preprocessing/kidney_filter.rds")
 # liver_object <- load_seurat_object("output/preprocessing/liver_filter.rds")
@@ -91,8 +91,8 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
                     tfMotifs = scorpion_input$tf,
                     gexMatrix = scorpion_input$gex,
                     ppiNet = scorpion_input$ppi,
-                    alphaValue = 0.1,
-                    outNet = c("regulatory")
+                    alphaValue = 0.1 # ,
+                    # outNet = c("regulatory")
                 )
             },
             error = function(e) {
@@ -128,10 +128,10 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
 }
 
 # Run SCORPION for blood
-run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput2.Rdata")
+run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput3.Rdata")
 
 # Run SCORPION for lung
-run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput2.Rdata")
+run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput3.Rdata")
 
 # # Run SCORPION for fat
 # run_scorpion("fat", fat_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "adipose_stem_cell"), "output/networks/final/fatScorpionOutput.Rdata")

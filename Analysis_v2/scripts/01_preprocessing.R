@@ -104,6 +104,10 @@ fat_object_filter <- fat_object[, cells_to_keep_fat]
 kidney_object_filter <- kidney_object[, cells_to_keep_kidney]
 liver_object_filter <- liver_object[, cells_to_keep_liver]
 
+# Remove intermediate variables
+# rm(cells_to_keep_blood, cells_to_keep_lung, cells_to_keep_fat, cells_to_keep_kidney, cells_to_keep_liver,
+#    blood_mappings, lung_mappings, fat_mappings, kidney_mappings, liver_mappings)
+
 
 #### 4. Convert ensembl ids to gene names and remove duplicates ####
 
@@ -167,31 +171,31 @@ cat("- Filtered objects -", format(Sys.time()), "\n", file = progress_file, appe
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
 
 # Save the filtered objects
-saveRDS(blood_object_filter, "blood_filter.rds")
-saveRDS(lung_object_filter, "lung_filter.rds")
-saveRDS(fat_object_filter, "fat_filter.rds")
-saveRDS(kidney_object_filter, "kidney_filter.rds")
-saveRDS(liver_object_filter, "liver_filter.rds")
-cat("- Saved filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+# saveRDS(blood_object_filter, "blood_filter.rds")
+# saveRDS(lung_object_filter, "lung_filter.rds")
+# saveRDS(fat_object_filter, "fat_filter.rds")
+# saveRDS(kidney_object_filter, "kidney_filter.rds")
+# saveRDS(liver_object_filter, "liver_filter.rds")
+# cat("- Saved filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 5. Batch correction on counts ####
 # Kidney is not included, as this tissue only has one donor
 
-blood_object_batch <- sva::ComBat_seq(as.matrix(blood_object_filter@assays$RNA@counts), batch = blood_object_filter$donor_id)
-lung_object_batch <- sva::ComBat_seq(as.matrix(lung_object_filter@assays$RNA@counts), batch = lung_object_filter$donor_id)
-fat_object_batch <- sva::ComBat_seq(as.matrix(fat_object_filter@assays$RNA@counts), batch = fat_object_filter$donor_id)
-liver_object_batch <- sva::ComBat_seq(as.matrix(liver_object_filter@assays$RNA@counts), batch = liver_object_filter$donor_id)
+blood_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(blood_object_filter@assays$RNA@counts), batch = blood_object_filter$donor_id)
+lung_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(lung_object_filter@assays$RNA@counts), batch = lung_object_filter$donor_id)
+fat_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(fat_object_filter@assays$RNA@counts), batch = fat_object_filter$donor_id)
+liver_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(liver_object_filter@assays$RNA@counts), batch = liver_object_filter$donor_id)
 # kidney_object_final <- sva::ComBat_seq(as.matrix(kidney_object_filter@assays$RNA@counts), batch = kidney_object_filter$donor_id)
 cat("- Batch corrected objects with ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 # Save the batch-corrected objects
-saveRDS(blood_object_batch, "blood_batch.rds")
-saveRDS(lung_object_batch, "lung_batch.rds")
-saveRDS(fat_object_batch, "fat_batch.rds")
-saveRDS(kidney_object_filter, "kidney_batch.rds")
-saveRDS(liver_object_batch, "liver_batch.rds")
+saveRDS(blood_object_filter, "blood_prepped.rds")
+saveRDS(lung_object_filter, "lung_prepped.rds")
+saveRDS(fat_object_filter, "fat_prepped.rds")
+saveRDS(liver_object_filter, "liver_prepped.rds")
+saveRDS(kidney_object_filter, "kidney_prepped.rds")
 cat("- Saved batch-corrected objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 

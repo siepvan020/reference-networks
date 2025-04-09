@@ -16,15 +16,15 @@ library(ggplot2)
 library(sva)
 
 # Set working directory
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/data")
+setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 
 #### 1. Load data ####
-blood_object <- readRDS("rds/TS_v2_Blood.rds")
-lung_object <- readRDS("rds/TS_v2_Lung.rds")
-fat_object <- readRDS("rds/TS_v2_Fat.rds")
-kidney_object <- readRDS("rds/TS_v2_Kidney.rds")
-liver_object <- readRDS("rds/TS_v2_Liver.rds")
+blood_object <- readRDS("data/rds/TS_v2_Blood.rds")
+lung_object <- readRDS("data/rds/TS_v2_Lung.rds")
+# fat_object <- readRDS("data/rds/TS_v2_Fat.rds")
+# kidney_object <- readRDS("data/rds/TS_v2_Kidney.rds")
+# liver_object <- readRDS("data/rds/TS_v2_Liver.rds")
 cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
@@ -167,8 +167,6 @@ kidney_object_filter <- update_gene_names_and_filter(kidney_object_filter, keep_
 liver_object_filter <- update_gene_names_and_filter(liver_object_filter, keep_genes, features)
 cat("- Filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
-
 # Save the filtered objects
 # saveRDS(blood_object_filter, "blood_filter.rds")
 # saveRDS(lung_object_filter, "lung_filter.rds")
@@ -223,11 +221,11 @@ liver_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(liver_object_fi
 cat("- Batch corrected objects with ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Save the batch-corrected objects
-saveRDS(blood_object_filter, "blood_prepped.rds")
-saveRDS(lung_object_filter, "lung_prepped.rds")
-saveRDS(fat_object_filter, "fat_prepped.rds")
-saveRDS(liver_object_filter, "liver_prepped.rds")
-saveRDS(kidney_object_filter, "kidney_prepped.rds")
+saveRDS(blood_object_filter, "output/preprocessing/blood_prepped.rds")
+saveRDS(lung_object_filter, "output/preprocessing/lung_prepped.rds")
+# saveRDS(fat_object_filter, "output/preprocessing/fat_prepped.rds")
+# saveRDS(liver_object_filter, "output/preprocessing/liver_prepped.rds")
+# saveRDS(kidney_object_filter, "output/preprocessing/kidney_prepped.rds")
 cat("- Saved batch-corrected objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Generate umap after correcting for batch effect
@@ -259,7 +257,7 @@ for (tissue in names(batch_plots_before)) {
 }
 
 # Save combined plots to PDF
-pdf("plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
+pdf("output/preprocessing/plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
 for (tissue in names(combined_batch_plots)) {
     print(combined_batch_plots[[tissue]]$combined_donor_plot)
     print(combined_batch_plots[[tissue]]$combined_cell_type_plot)
@@ -347,7 +345,7 @@ gex_plots <- list(
 )
 
 # Save all expression plots to a single PDF
-pdf("plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 5)
+pdf("output/preprocessing/plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 5)
 for (plot in gex_plots) {
     print(plot)
 }

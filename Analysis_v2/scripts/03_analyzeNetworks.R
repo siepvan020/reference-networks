@@ -21,14 +21,14 @@ library(Seurat)
 # library(biomaRt)
 
 # Set working directory
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/networks")
+setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 #### 1. Load and format data ####
-load("final/bloodScorpionOutput2.Rdata")
-load("final/lungScorpionOutput2.Rdata")
-load("final/fatScorpionOutput.Rdata")
-load("final/kidneyScorpionOutput.Rdata")
-load("final/liverScorpionOutput.Rdata")
+load("output/networks/final/bloodScorpionOutput3.Rdata")
+load("output/networks/final/lungScorpionOutput3.Rdata")
+# load("final/fatScorpionOutput3.Rdata")
+# load("final/kidneyScorpionOutput3.Rdata")
+# load("final/liverScorpionOutput3.Rdata")
 
 
 #### 2. Calculate indegrees & outdegrees ####
@@ -44,9 +44,9 @@ calculate_indegrees <- function(output, tissue_name) {
 
 blood_indegrees <- calculate_indegrees(blood_output, "blood")
 lung_indegrees <- calculate_indegrees(lung_output, "lung")
-fat_indegrees <- calculate_indegrees(fat_output, "fat")
-kidney_indegrees <- calculate_indegrees(kidney_output, "kidney")
-liver_indegrees <- calculate_indegrees(liver_output, "liver")
+# fat_indegrees <- calculate_indegrees(fat_output, "fat")
+# kidney_indegrees <- calculate_indegrees(kidney_output, "kidney")
+# liver_indegrees <- calculate_indegrees(liver_output, "liver")
 
 # Combine blood and lung indegrees and outdegrees into one dataframe
 combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees)) # , fat_indegrees, kidney_indegrees, liver_indegrees))
@@ -57,10 +57,8 @@ cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.ob
 # Convert the correlation matrix to a long format for ggplot
 cor_long <- as.data.frame(as.table(cor_indegree_matrix))
 
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/analysis")
-
 # Plot the one-sided correlation matrix with values in the tiles
-ggsave("correlation/correlation_matrix_indegrees2.pdf", ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
+ggsave("output/analysis/correlation/run3_correlation_matrix_indegrees.pdf", ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
     geom_tile(na.rm = TRUE) +
     geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
     scale_fill_gradient(low = "white", high = "steelblue", name = "Pearson's r value") +
@@ -142,9 +140,9 @@ for (comp in comparisons) {
 }
 
 # Save plots of the linear regression models
-ggsave("linear_regression/immune_cells_between_tissues2.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
-ggsave("linear_regression/immune_cells_lung2.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
-ggsave("linear_regression/tissue_specific_linear2.pdf", plot_list[[7]], width = 12, height = 6)
+ggsave("output/analysis/linear_regression/run3/immune_cells_between_tissues3.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
+ggsave("output/analysis/linear_regression/run3/immune_cells_lung3.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
+ggsave("output/analysis/linear_regression/run3/tissue_specific_linear3.pdf", plot_list[[7]], width = 12, height = 6)
 
 
 
@@ -257,7 +255,7 @@ for (comp in names(gsea_results)) {
     # Save plots
     updotplot <- gsea_plots[[comp]]$up
     downdotplot <- gsea_plots[[comp]]$down
-    pdf(file = paste0("gsea_dotplots/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
+    pdf(file = paste0("output/analysis/gsea_dotplots/run3/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
     print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
     dev.off()
     iteration <- iteration + 1
@@ -265,8 +263,6 @@ for (comp in names(gsea_results)) {
 
 
 #### 5. Run GSEA on expression data ####
-
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 blood_object <- readRDS("output/preprocessing/blood_filter.rds")
 Idents(blood_object) <- "cell_type"
@@ -289,10 +285,11 @@ gex_fit <- list()
 gex_plot <- list()
 for (comp in comparisons) {
     cat("Calculating gex residuals for:", comp$name, "\n")
-    result <- calculate_residuals(combined_exp_matrix, comp$x, comp$y)
+    data <- combined_exp_matrix[complete.cases(combined_exp_matrix[[comp$x]], combined_exp_matrix[[comp$y]]), ] # Only keep complete cases between conditions
+    result <- calculate_residuals(data, comp$x, comp$y)
     gex_residuals[[comp$name]] <- result$residuals
     gex_fit[[comp$name]] <- result$fit
-    gex_plot[[comp$name]] <- plot_linear_regression(combined_exp_matrix, comp$x, comp$y, comp$name, result$residuals)
+    gex_plot[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals)
 }
 
 table(stringr::str_extract(names(gex_residuals[[5]]), "ENSG[0-9]+.[0-9]+"))

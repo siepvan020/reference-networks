@@ -13,7 +13,6 @@ library(SeuratObject)
 library(biomaRt)
 library(dplyr)
 library(ggplot2)
-library(harmony)
 library(sva)
 
 # Set working directory
@@ -179,16 +178,49 @@ setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2/output/preprocessing")
 # cat("- Saved filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
-#### 5. Batch correction on counts ####
-# Kidney is not included, as this tissue only has one donor
+#### 5. Plot batch effect ####
+inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
+    stage <- match.arg(stage)
 
+    # Set reduction name based on stage
+    reduction_name <- if (stage == "before") "umap_before" else "umap_after"
+
+    # Run Seurat steps
+    object <- Seurat::FindVariableFeatures(object, verbose = FALSE)
+    object <- Seurat::ScaleData(object, verbose = FALSE)
+    object <- Seurat::RunPCA(object, npcs = 30, verbose = FALSE, reduction.name = paste0("pca_", stage))
+    object <- Seurat::RunUMAP(object, reduction = paste0("pca_", stage), dims = 1:20, reduction.name = reduction_name)
+
+    # Plot UMAP grouped by donor_id
+    plot_donor <- Seurat::DimPlot(object, reduction = reduction_name, group.by = "donor_id", pt.size = 0.75) +
+        theme_minimal() +
+        ggtitle(paste(toupper(stage), "Batch Correction -", tissue, "- Donor ID"))
+
+    # Plot UMAP grouped by cell_type
+    plot_cell_type <- Seurat::DimPlot(object, reduction = reduction_name, group.by = "cell_type", pt.size = 0.75) +
+        theme_minimal() +
+        ggtitle(paste(toupper(stage), "Batch Correction -", tissue, "- Cell Type"))
+
+    return(list(plot_donor = plot_donor, plot_cell_type = plot_cell_type))
+}
+
+# Generate umap before correcting for batch effect
+batch_plots_before <- list(
+    blood = inspect_batch_effect(blood_object_filter, "blood", stage = "before"),
+    lung = inspect_batch_effect(lung_object_filter, "lung", stage = "before") # ,
+    # fat = inspect_batch_effect(fat_object_filter, "fat", stage = "before"),
+    # kidney = inspect_batch_effect(kidney_object_filter, "kidney", stage = "before"),
+    # liver = inspect_batch_effect(liver_object_filter, "liver", stage = "before")
+)
+
+
+#### 6. Batch correction on counts matrix ####
+# Kidney is not included, as this tissue only has one donor
 blood_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(blood_object_filter@assays$RNA@counts), batch = blood_object_filter$donor_id)
 lung_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(lung_object_filter@assays$RNA@counts), batch = lung_object_filter$donor_id)
 fat_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(fat_object_filter@assays$RNA@counts), batch = fat_object_filter$donor_id)
 liver_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(liver_object_filter@assays$RNA@counts), batch = liver_object_filter$donor_id)
-# kidney_object_final <- sva::ComBat_seq(as.matrix(kidney_object_filter@assays$RNA@counts), batch = kidney_object_filter$donor_id)
 cat("- Batch corrected objects with ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-
 
 # Save the batch-corrected objects
 saveRDS(blood_object_filter, "blood_prepped.rds")
@@ -198,8 +230,44 @@ saveRDS(liver_object_filter, "liver_prepped.rds")
 saveRDS(kidney_object_filter, "kidney_prepped.rds")
 cat("- Saved batch-corrected objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
+# Generate umap after correcting for batch effect
+batch_plots_after <- list(
+    blood = inspect_batch_effect(blood_object_filter, "blood", stage = "after"),
+    lung = inspect_batch_effect(lung_object_filter, "lung", stage = "after") # ,
+    # fat = inspect_batch_effect(fat_object_filter, "fat", stage = "after"),
+    # kidney = inspect_batch_effect(kidney_object_filter, "kidney", stage = "after"),
+    # liver = inspect_batch_effect(liver_object_filter, "liver", stage = "after")
+)
 
-#### 5. Plot gene expression scatter plot for each tissue ####
+# Combine before and after batch effect plots for each tissue
+combined_batch_plots <- list()
+
+for (tissue in names(batch_plots_before)) {
+    before_plots <- batch_plots_before[[tissue]]
+    after_plots <- batch_plots_after[[tissue]]
+
+    # Combine donor plots
+    combined_donor_plot <- before_plots$plot_donor + after_plots$plot_donor
+
+    # Combine cell type plots
+    combined_cell_type_plot <- before_plots$plot_cell_type + after_plots$plot_cell_type
+
+    combined_batch_plots[[tissue]] <- list(
+        combined_donor_plot = combined_donor_plot,
+        combined_cell_type_plot = combined_cell_type_plot
+    )
+}
+
+# Save combined plots to PDF
+pdf("plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
+for (tissue in names(combined_batch_plots)) {
+    print(combined_batch_plots[[tissue]]$combined_donor_plot)
+    print(combined_batch_plots[[tissue]]$combined_cell_type_plot)
+}
+dev.off()
+
+
+#### 7. Plot gene expression scatter plot for each tissue ####
 
 # Connect to Ensembl
 ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
@@ -260,90 +328,27 @@ generate_gene_expression_plot <- function(df, tissue_name) {
     return(p)
 }
 
-if (interactive()) {
-    # Retrieve gene biotypes and save to a named list
-    gene_df <- list(
-        blood = get_gene_biotypes(blood_object_filter),
-        lung = get_gene_biotypes(lung_object_filter),
-        fat = get_gene_biotypes(fat_object_filter),
-        kidney = get_gene_biotypes(kidney_object_filter),
-        liver = get_gene_biotypes(liver_object_filter)
-    )
+# Retrieve gene biotypes and save to a named list
+gene_df <- list(
+    blood = get_gene_biotypes(blood_object_filter),
+    lung = get_gene_biotypes(lung_object_filter),
+    fat = get_gene_biotypes(fat_object_filter),
+    kidney = get_gene_biotypes(kidney_object_filter),
+    liver = get_gene_biotypes(liver_object_filter)
+)
 
-    # Generate plots for all tissues
-    gex_plots <- list(
-        blood = generate_gene_expression_plot(gene_df$blood, "blood"),
-        lung = generate_gene_expression_plot(gene_df$lung, "lung"),
-        fat = generate_gene_expression_plot(gene_df$fat, "fat"),
-        kidney = generate_gene_expression_plot(gene_df$kidney, "kidney"),
-        liver = generate_gene_expression_plot(gene_df$liver, "liver")
-    )
+# Generate plots for all tissues
+gex_plots <- list(
+    blood = generate_gene_expression_plot(gene_df$blood, "blood"),
+    lung = generate_gene_expression_plot(gene_df$lung, "lung"),
+    fat = generate_gene_expression_plot(gene_df$fat, "fat"),
+    kidney = generate_gene_expression_plot(gene_df$kidney, "kidney"),
+    liver = generate_gene_expression_plot(gene_df$liver, "liver")
+)
 
-    # Save all expression plots to a single PDF
-    pdf("plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 5)
-    for (plot in gex_plots) {
-        print(plot)
-    }
-    dev.off()
+# Save all expression plots to a single PDF
+pdf("plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 5)
+for (plot in gex_plots) {
+    print(plot)
 }
-
-
-#### 6. Plot batch effect ####
-inspect_batch_effect <- function(object, tissue) {
-    object <- Seurat::FindVariableFeatures(object, verbose = FALSE)
-    object <- Seurat::ScaleData(object, verbose = FALSE)
-    object <- Seurat::RunPCA(object, npcs = 30, verbose = FALSE, reduction.name = "pca")
-    object <- Seurat::RunUMAP(object, reduction = "pca", dims = 1:20, reduction.name = "umap")
-    object <- harmony::RunHarmony(object, group.by.vars = "donor_id", reduction = "umap")
-
-    # Plot UMAP with batch effect
-    p1 <- Seurat::DimPlot(object, reduction = "umap", group.by = "donor_id", pt.size = 0.75) +
-        theme_minimal() +
-        ggtitle(paste("Before Batch Correction - "), tissue)
-    p2 <- Seurat::DimPlot(object, reduction = "harmony", group.by = "donor_id", pt.size = 0.75) +
-        theme_minimal() +
-        ggtitle(paste("After Batch Correction - "), tissue)
-    donor_plot <- p1 + p2
-
-    p3 <- Seurat::DimPlot(object, reduction = "umap", group.by = "cell_type", pt.size = 0.75) +
-        theme_minimal() +
-        ggtitle(paste("Before Batch Correction - "), tissue)
-    p4 <- Seurat::DimPlot(object, reduction = "harmony", group.by = "cell_type", pt.size = 0.75) +
-        theme_minimal() +
-        ggtitle(paste("After Batch Correction - "), tissue)
-    celltype_plot <- p3 + p4
-
-    return(list(donor_plot = donor_plot, celltype_plot = celltype_plot))
-}
-
-if (interactive()) {
-    batch_plots <- list(
-        blood = inspect_batch_effect(blood_object_filter, "blood"),
-        lung = inspect_batch_effect(lung_object_filter, "lung"),
-        fat = inspect_batch_effect(fat_object_filter, "fat"),
-        # kidney = inspect_batch_effect(kidney_object_filter, "kidney"),
-        liver = inspect_batch_effect(liver_object_filter, "liver")
-    )
-
-    # Save all batch effect plots to a single PDF
-    pdf("plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
-    for (plot in batch_plots) {
-        print(plot)
-    }
-    dev.off()
-}
-
-
-
-
-# amount of genes with non-zero expression across cells (tissue-specific)
-# > length(rownames(blood_object_filter[rowSums(blood_object_filter) > 0, ]))
-# [1] 56055
-# > length(rownames(lung_object_filter[rowSums(lung_object_filter) > 0, ]))
-# [1] 51646
-# > length(rownames(liver_object_filter[rowSums(liver_object_filter) > 0, ]))
-# [1] 43511
-# > length(rownames(fat_object_filter[rowSums(fat_object_filter) > 0, ]))
-# [1] 45310
-# > length(rownames(kidney_object_filter[rowSums(kidney_object_filter) > 0, ]))
-# [1] 45654
+dev.off()

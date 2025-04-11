@@ -11,6 +11,7 @@ if (!requireNamespace("fgsea", quietly = TRUE)) BiocManager::install("fgsea")
 
 # Load required packages
 library(ggplot2)
+library(ggrepel)
 library(patchwork)
 library(msigdbr)
 library(fgsea)
@@ -57,16 +58,20 @@ cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.ob
 # Convert the correlation matrix to a long format for ggplot
 cor_long <- as.data.frame(as.table(cor_indegree_matrix))
 
-# Plot the one-sided correlation matrix with values in the tiles
-ggsave("output/analysis/correlation/run3_correlation_matrix_indegrees.pdf", ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
-    geom_tile(na.rm = TRUE) +
-    geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
-    scale_fill_gradient(low = "white", high = "steelblue", name = "Pearson's r value") +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-    labs(x = "Cell Types", y = "Cell Types", title = "Correlation Matrix of Indegrees"),
-width = 12, height = 6
-)
+# Function to plot the correlation matrix with values in the tiles
+plot_correlation_matrix <- function(cor_long, title = "Correlation Matrix of Indegrees") {
+    ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
+        geom_tile(na.rm = TRUE) +
+        geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
+        scale_fill_gradient(low = "white", high = "steelblue", name = "Pearson's r value") +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+        labs(x = "Cell Types", y = "Cell Types", title = title)
+}
+
+cor_indegree_plot <- plot_correlation_matrix(cor_long, title = "Correlation Matrix of Indegrees")
+ggsave("output/analysis/correlation/run3_correlation_matrix_indegrees", cor_indegree_plot, width = 12, height = 6)
+
 
 #### 3. Calculate linear regression and residuals between conditions ####
 
@@ -89,40 +94,40 @@ calculate_residuals <- function(data, x_con, y_con) {
     return(list(fit = fit, residuals = res[order(-res)])) # Return fit and ranked residuals
 }
 
-# Function to plot linear regression with ggplot and label extreme residuals
-plot_linear_regression <- function(data, x_con, y_con, comp_name, residuals) {
-    top_gene <- names(residuals)[1] # Gene with highest residual
-    bottom_gene <- names(residuals)[length(residuals)] # Gene with lowest residual
+plot_linear_regression <- function(data, x_con, y_con, comp_name, residuals, fit) {
+    # Compute prediction intervals
+    data$fit <- predict(fit, newdata = data)
 
-    ggplot(data, aes(x = .data[[x_con]], y = .data[[y_con]])) +
-        geom_point(alpha = 0.5) +
-        geom_point(
-            data = data %>% filter(gene %in% c(top_gene, bottom_gene)),
-            aes(color = gene),
-            size = 3
+    # Identify top 5 and bottom 5 genes
+    extreme_genes <- c(head(names(residuals), 5), tail(names(residuals), 5))
+
+    # Assign colors and labels for extreme genes
+    data$color <- ifelse(data$gene %in% extreme_genes, ifelse(data$gene %in% head(names(residuals), 5), "red", "blue"), "#2c2c2cc4")
+    data$label <- ifelse(data$gene %in% extreme_genes, data$gene, NA)
+
+    # Build the plot
+    p <- ggplot(data, aes_string(x = x_con, y = y_con)) +
+        geom_point(alpha = 0.5, aes(color = color)) +
+        geom_point(data = filter(data, gene %in% extreme_genes), aes(color = color), alpha = 0.75, size = 1.25) +
+        geom_line(aes(y = fit), color = "red", size = 0.75) +
+        geom_density_2d(color = "gray", alpha = 0.5) +
+        geom_text_repel(
+            data = filter(data, gene %in% extreme_genes),
+            aes(label = label, color = color),
+            fontface = 3,
+            min.segment.length = 0,
+            size = 3,
+            segment.size = 0.1,
+            max.overlaps = 75,
+            bg.color = "white"
         ) +
-        scale_color_manual(values = setNames(c("red", "blue"), c(top_gene, bottom_gene))) +
-        geom_smooth(method = "lm", se = FALSE, color = "red") +
-        geom_text(
-            data = data %>% filter(gene == top_gene),
-            aes(label = gene, color = gene),
-            vjust = -1,
-            size = 5,
-            fontface = "bold"
-        ) +
-        geom_text(
-            data = data %>% filter(gene == bottom_gene),
-            aes(label = gene, color = gene),
-            vjust = 1.5,
-            size = 5,
-            fontface = "bold"
-        ) +
+        scale_color_identity() +
         labs(
             title = paste("Linear Regression:", comp_name),
             x = x_con,
             y = y_con
         ) +
-        theme_minimal() +
+        theme_light() +
         theme(legend.position = "none")
 }
 
@@ -136,7 +141,7 @@ for (comp in comparisons) {
     result <- calculate_residuals(data, comp$x, comp$y)
     residuals_list[[comp$name]] <- result$residuals
     fit_list[[comp$name]] <- result$fit
-    plot_list[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals)
+    plot_list[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals, result$fit)
 }
 
 # Save plots of the linear regression models
@@ -255,7 +260,7 @@ for (comp in names(gsea_results)) {
     # Save plots
     updotplot <- gsea_plots[[comp]]$up
     downdotplot <- gsea_plots[[comp]]$down
-    pdf(file = paste0("output/analysis/gsea_dotplots/run3/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
+    pdf(file = paste0("output/analysis/gsea_dotplots/run3", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
     print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
     dev.off()
     iteration <- iteration + 1
@@ -279,6 +284,15 @@ combined_exp_matrix <- merge(blood_sum_exp, lung_sum_exp, by = "row.names", all 
 colnames(combined_exp_matrix)[1] <- "gene"
 cor_exp_matrix <- cor(combined_exp_matrix[, -1], use = "pairwise.complete.obs")
 
+cor_exp_long <- as.data.frame(as.table(cor_exp_matrix))
+difference_long <- as.data.frame(as.table(cor_indegree_matrix - cor_exp_matrix)) # use the ggplot function on line 62 to plot this
+
+cor_exp_plot <- plot_correlation_matrix(cor_exp_long, title = "Correlation Matrix of Expression")
+ggsave("output/analysis/correlation/run3_correlation_matrix_indegrees", cor_indegree_plot, width = 12, height = 6)
+cor_dif_plot <- plot_correlation_matrix(difference_long, title = "Difference in Correlation Matrix of Indegrees and Expression")
+ggsave("output/analysis/correlation/correlation_matrix_expression", cor_dif_plot, width = 12, height = 6)
+
+
 ##### Calculate residuals for each comparison #####
 gex_residuals <- list()
 gex_fit <- list()
@@ -289,8 +303,13 @@ for (comp in comparisons) {
     result <- calculate_residuals(data, comp$x, comp$y)
     gex_residuals[[comp$name]] <- result$residuals
     gex_fit[[comp$name]] <- result$fit
-    gex_plot[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals)
+    gex_plot[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals, result$fit)
 }
+
+# Save plots of the linear regression models
+ggsave("output/analysis/linear_regression/gex/immune_cells_between_tissues.pdf", patchwork::wrap_plots(A = gex_plot[[1]], B = gex_plot[[2]], C = gex_plot[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
+ggsave("output/analysis/linear_regression/gex/immune_cells_lung.pdf", patchwork::wrap_plots(A = gex_plot[[4]], B = gex_plot[[5]], C = gex_plot[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
+ggsave("output/analysis/linear_regression/gex/tissue_specific_linear.pdf", gex_plot[[7]], width = 12, height = 6)
 
 table(stringr::str_extract(names(gex_residuals[[5]]), "ENSG[0-9]+.[0-9]+"))
 

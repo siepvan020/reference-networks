@@ -59,8 +59,8 @@ cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.ob
 cor_long <- as.data.frame(as.table(cor_indegree_matrix))
 
 # Function to plot the correlation matrix with values in the tiles
-plot_correlation_matrix <- function(cor_long, title = "Correlation Matrix of Indegrees") {
-    ggplot(cor_long, aes(Var1, Var2, fill = Freq)) +
+plot_correlation_matrix <- function(data, title = "Correlation Matrix of Indegrees") {
+    ggplot(data, aes(Var1, Var2, fill = Freq)) +
         geom_tile(na.rm = TRUE) +
         geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
         scale_fill_gradient(low = "white", high = "steelblue", name = "Pearson's r value") +
@@ -153,40 +153,45 @@ ggsave("output/analysis/linear_regression/run3/tissue_specific_linear3.pdf", plo
 
 #### 4. Run GSEA on ranked residuals ####
 
-# Load gene sets for GO:BP and GO:MF using gene symbols
-msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")[, c("gs_name", "gene_symbol")]
-msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "MF")[, c("gs_name", "gene_symbol")]
+run_gsea <- function(residuals_list, minSize = 10, maxSize = 500, nproc = 1) {
+    gsea_results <- list()
+    options(warn = 1)
 
-# Convert to fgsea-compatible format (list of gene sets)
-msigdb_BP <- split(msigdb_BP$gene_symbol, msigdb_BP$gs_name)
-msigdb_MF <- split(msigdb_MF$gene_symbol, msigdb_MF$gs_name)
+    # Load gene sets for GO:BP and GO:MF using gene symbols
+    msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")[, c("gs_name", "gene_symbol")]
+    msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "MF")[, c("gs_name", "gene_symbol")]
 
-gsea_results <- list()
+    # Convert to fgsea-compatible format (list of gene sets)
+    msigdb_BP <- split(msigdb_BP$gene_symbol, msigdb_BP$gs_name)
+    msigdb_MF <- split(msigdb_MF$gene_symbol, msigdb_MF$gs_name)
 
-options(warn = 1)
-for (comp in names(residuals_list)) {
-    cat("Running GSEA for:", comp, "\n")
+    for (comp in names(residuals_list)) {
+        cat("Running GSEA for:", comp, "\n")
 
-    ranked_genes <- residuals_list[[comp]] # Get ranked gene list
+        ranked_genes <- residuals_list[[comp]] # Get ranked gene list
 
-    # Run fgsea for GO:BP
-    gsea_results[[paste0("BP_", comp)]] <- fgsea(
-        pathways = msigdb_BP,
-        stats = ranked_genes,
-        minSize = 10,
-        maxSize = 500,
-        nproc = 1
-    )
+        # Run fgsea for GO:BP
+        gsea_results[[paste0("BP_", comp)]] <- fgsea(
+            pathways = msigdb_BP,
+            stats = ranked_genes,
+            minSize = minSize,
+            maxSize = maxSize,
+            nproc = nproc
+        )
 
-    # Run fgsea for GO:MF
-    gsea_results[[paste0("MF_", comp)]] <- fgsea(
-        pathways = msigdb_MF,
-        stats = ranked_genes,
-        minSize = 10,
-        maxSize = 500,
-        nproc = 1
-    )
+        # Run fgsea for GO:MF
+        gsea_results[[paste0("MF_", comp)]] <- fgsea(
+            pathways = msigdb_MF,
+            stats = ranked_genes,
+            minSize = minSize,
+            maxSize = maxSize,
+            nproc = nproc
+        )
+    }
+    return(gsea_results)
 }
+
+gsea_results_indegree <- run_gsea(residuals_list)
 
 # Function to get top up and down pathways
 get_top_pathways <- function(gsea_result) {
@@ -250,7 +255,7 @@ plot_top_pathways <- function(topPathways, comparison_name) {
 gsea_plots <- list()
 top_pathways_list <- list()
 iteration <- 1
-for (comp in names(gsea_results)) {
+for (comp in names(gsea_results_indegree)) {
     # Generate plots
     cat("Plotting GSEA results for:", comp, "\n")
     topPathways <- get_top_pathways(gsea_results[[comp]])
@@ -267,7 +272,7 @@ for (comp in names(gsea_results)) {
 }
 
 
-#### 5. Run GSEA on expression data ####
+#### 5. Run analysis on expression data ####
 
 blood_object <- readRDS("output/preprocessing/blood_filter.rds")
 Idents(blood_object) <- "cell_type"
@@ -285,12 +290,12 @@ colnames(combined_exp_matrix)[1] <- "gene"
 cor_exp_matrix <- cor(combined_exp_matrix[, -1], use = "pairwise.complete.obs")
 
 cor_exp_long <- as.data.frame(as.table(cor_exp_matrix))
-difference_long <- as.data.frame(as.table(cor_indegree_matrix - cor_exp_matrix)) # use the ggplot function on line 62 to plot this
+difference_long <- as.data.frame(as.table(cor_indegree_matrix - cor_exp_matrix))
 
 cor_exp_plot <- plot_correlation_matrix(cor_exp_long, title = "Correlation Matrix of Expression")
-ggsave("output/analysis/correlation/run3_correlation_matrix_indegrees", cor_indegree_plot, width = 12, height = 6)
+ggsave("output/analysis/correlation/correlation_matrix_expression.pdf", cor_exp_plot, width = 12, height = 6)
 cor_dif_plot <- plot_correlation_matrix(difference_long, title = "Difference in Correlation Matrix of Indegrees and Expression")
-ggsave("output/analysis/correlation/correlation_matrix_expression", cor_dif_plot, width = 12, height = 6)
+ggsave("output/analysis/correlation/correlation_matrices_difference.pdf", cor_dif_plot, width = 12, height = 6)
 
 
 ##### Calculate residuals for each comparison #####
@@ -310,6 +315,30 @@ for (comp in comparisons) {
 ggsave("output/analysis/linear_regression/gex/immune_cells_between_tissues.pdf", patchwork::wrap_plots(A = gex_plot[[1]], B = gex_plot[[2]], C = gex_plot[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
 ggsave("output/analysis/linear_regression/gex/immune_cells_lung.pdf", patchwork::wrap_plots(A = gex_plot[[4]], B = gex_plot[[5]], C = gex_plot[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
 ggsave("output/analysis/linear_regression/gex/tissue_specific_linear.pdf", gex_plot[[7]], width = 12, height = 6)
+
+# Run GSEA on the expression data
+gsea_results_gex <- run_gsea(gex_residuals)
+
+# Generate plots for all comparisons in gsea_results and save to a list
+gsea_gex_plots <- list()
+gex_top_pathways_list <- list()
+iteration <- 1
+for (comp in names(gsea_results_gex)) {
+    # Generate plots
+    cat("Plotting GSEA results for:", comp, "\n")
+    topPathways <- get_top_pathways(gsea_results_gex[[comp]])
+    gsea_plots[[comp]] <- plot_top_pathways(topPathways, comp)
+    top_pathways_list[[comp]] <- topPathways
+
+    # Save plots
+    updotplot <- gsea_plots[[comp]]$up
+    downdotplot <- gsea_plots[[comp]]$down
+    pdf(file = paste0("output/analysis/gsea_dotplots/gex/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
+    print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
+    dev.off()
+    iteration <- iteration + 1
+}
+
 
 table(stringr::str_extract(names(gex_residuals[[5]]), "ENSG[0-9]+.[0-9]+"))
 

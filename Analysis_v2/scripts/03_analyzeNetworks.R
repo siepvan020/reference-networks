@@ -198,13 +198,6 @@ get_top_pathways <- function(gsea_result) {
     sig_pathways <- gsea_result %>%
         filter(padj < 0.05)
 
-    sig_pathways <- sig_pathways %>%
-        mutate(
-            pathway = gsub("_", " ", as.character(pathway)),
-            pathway = str_wrap(pathway, width = 50, whitespace_only = FALSE),
-            pathway = gsub(" ", "_", pathway)
-        )
-
     topPathwaysUp <- sig_pathways %>%
         filter(NES > 0) %>%
         arrange(desc(NES)) %>%
@@ -222,6 +215,15 @@ get_top_pathways <- function(gsea_result) {
 
 # Function to plot top pathways
 plot_top_pathways <- function(topPathways, comparison_name) {
+    for (dir in c("up", "down")) {
+        topPathways[[dir]] <- topPathways[[dir]] %>%
+            mutate(
+                pathway = gsub("_", " ", as.character(pathway)),
+                pathway = str_wrap(pathway, width = 50, whitespace_only = FALSE),
+                pathway = gsub(" ", "_", pathway)
+            )
+    }
+    
     p1 <- ggplot(topPathways$up, aes(x = NES, y = reorder(pathway, NES), size = size, fill = NES)) +
         geom_point(shape = 21) +
         scale_size_area(max_size = 10) +
@@ -258,16 +260,16 @@ iteration <- 1
 for (comp in names(gsea_results_indegree)) {
     # Generate plots
     cat("Plotting GSEA results for:", comp, "\n")
-    topPathways <- get_top_pathways(gsea_results[[comp]])
+    topPathways <- get_top_pathways(gsea_results_indegree[[comp]])
     gsea_plots[[comp]] <- plot_top_pathways(topPathways, comp)
     top_pathways_list[[comp]] <- topPathways
 
     # Save plots
     updotplot <- gsea_plots[[comp]]$up
     downdotplot <- gsea_plots[[comp]]$down
-    pdf(file = paste0("output/analysis/gsea_dotplots/run3", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
-    print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
-    dev.off()
+    # pdf(file = paste0("output/analysis/gsea_dotplots/run3", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
+    # print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
+    # dev.off()
     iteration <- iteration + 1
 }
 
@@ -282,6 +284,9 @@ Idents(lung_object) <- "cell_type"
 ##### Calculate sum of expression for each gene in each cell type #####
 blood_sum_exp <- Seurat::AggregateExpression(blood_object)[[1]]
 lung_sum_exp <- Seurat::AggregateExpression(lung_object)[[1]]
+
+blood_sum_exp <- Seurat::AverageExpression(blood_object)[[1]]
+lung_sum_exp <- Seurat::AverageExpression(lung_object)[[1]]
 
 colnames(blood_sum_exp) <- paste0("blood_", colnames(blood_sum_exp))
 colnames(lung_sum_exp) <- paste0("lung_", colnames(lung_sum_exp))
@@ -327,12 +332,12 @@ for (comp in names(gsea_results_gex)) {
     # Generate plots
     cat("Plotting GSEA results for:", comp, "\n")
     topPathways <- get_top_pathways(gsea_results_gex[[comp]])
-    gsea_plots[[comp]] <- plot_top_pathways(topPathways, comp)
-    top_pathways_list[[comp]] <- topPathways
+    gsea_gex_plots[[comp]] <- plot_top_pathways(topPathways, comp)
+    gex_top_pathways_list[[comp]] <- topPathways
 
     # Save plots
-    updotplot <- gsea_plots[[comp]]$up
-    downdotplot <- gsea_plots[[comp]]$down
+    updotplot <- gsea_gex_plots[[comp]]$up
+    downdotplot <- gsea_gex_plots[[comp]]$down
     pdf(file = paste0("output/analysis/gsea_dotplots/gex/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
     print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
     dev.off()

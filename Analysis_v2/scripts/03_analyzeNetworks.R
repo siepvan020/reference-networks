@@ -59,11 +59,16 @@ cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.ob
 cor_long <- as.data.frame(as.table(cor_indegree_matrix))
 
 # Function to plot the correlation matrix with values in the tiles
-plot_correlation_matrix <- function(data, title = "Correlation Matrix of Indegrees") {
+plot_correlation_matrix <- function(data, title = "Correlation Matrix", from_zero = FALSE) {
     ggplot(data, aes(Var1, Var2, fill = Freq)) +
         geom_tile(na.rm = TRUE) +
         geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
-        scale_fill_gradient(low = "white", high = "steelblue", name = "Pearson's r value") +
+        scale_fill_gradient(
+            low = "white",
+            high = "steelblue",
+            name = "Pearson's r value",
+            limits = if (from_zero) c(0, 1) else NULL
+        ) +
         theme_minimal() +
         theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
         labs(x = "Cell Types", y = "Cell Types", title = title)
@@ -165,6 +170,7 @@ run_gsea <- function(residuals_list, minSize = 10, maxSize = 500, nproc = 1) {
     msigdb_BP <- split(msigdb_BP$gene_symbol, msigdb_BP$gs_name)
     msigdb_MF <- split(msigdb_MF$gene_symbol, msigdb_MF$gs_name)
 
+    set.seed(42)
     for (comp in names(residuals_list)) {
         cat("Running GSEA for:", comp, "\n")
 
@@ -219,11 +225,11 @@ plot_top_pathways <- function(topPathways, comparison_name) {
         topPathways[[dir]] <- topPathways[[dir]] %>%
             mutate(
                 pathway = gsub("_", " ", as.character(pathway)),
-                pathway = str_wrap(pathway, width = 50, whitespace_only = FALSE),
+                pathway = str_wrap(pathway, width = 50, whitespace_only = FALSE), # Wrap long pathway names
                 pathway = gsub(" ", "_", pathway)
             )
     }
-    
+
     p1 <- ggplot(topPathways$up, aes(x = NES, y = reorder(pathway, NES), size = size, fill = NES)) +
         geom_point(shape = 21) +
         scale_size_area(max_size = 10) +
@@ -231,7 +237,7 @@ plot_top_pathways <- function(topPathways, comparison_name) {
         theme(
             axis.text.y = element_text(size = 14),
             axis.title.y = element_blank(),
-            plot.title = element_text(hjust = 1, face = "bold") # Make title bold
+            plot.title = element_text(hjust = 1, face = "bold")
         ) +
         xlim(min(topPathways$up$NES), max(topPathways$up$NES)) +
         xlab("NES") +
@@ -244,7 +250,7 @@ plot_top_pathways <- function(topPathways, comparison_name) {
         theme(
             axis.text.y = element_text(size = 14),
             axis.title.y = element_blank(),
-            plot.title = element_text(hjust = 1, face = "bold") # Make title bold
+            plot.title = element_text(hjust = 1, face = "bold")
         ) +
         xlim(min(topPathways$down$NES), max(topPathways$down$NES)) +
         xlab("NES") +
@@ -273,6 +279,38 @@ for (comp in names(gsea_results_indegree)) {
     iteration <- iteration + 1
 }
 
+# Check for overlap between leading edge genes and rownames of the regulatory network
+leading_edge_genes <- top_pathways_list$BP_blood_platelet_vs_lung_2pneumo$up[1, ]$leadingEdge[[1]]
+# overlap_genes <- intersect(leading_edge_genes, colnames(lung_output$type_ii_pneumocyte$regNet))
+
+# Extract the columns of the regulatory network that match the overlapping genes
+overlap_columns <- lung_output$type_ii_pneumocyte$regNet[, leading_edge_genes, drop = FALSE]
+
+# Save the top 10 highest values (and corresponding rows) for each column
+top_edges <- apply(overlap_columns, 2, function(col) {
+    sorted_indices <- order(col, decreasing = TRUE)[1:5]
+    data.frame(tf = rownames(overlap_columns)[sorted_indices], edge = col[sorted_indices])
+})
+
+# Count the occurrences of each tf in the top_edges list
+tf_counts <- sort(table(unlist(lapply(top_edges, function(df) df$tf))), decreasing = TRUE)
+top_tfs <- names(tf_counts)[1:7]
+
+lung_subset <- subset(lung_object, idents = c("type_ii_pneumocyte")) # load lung expression object first
+blood_subset <- subset(blood_object, idents = c("platelet")) # load blood expression object first
+
+# Extract the rows from the object and sum up expression
+# overlap_sparse_matrix <- Seurat::AggregateExpression(lung_subset)[[1]][top_tfs, , drop = FALSE]
+as.data.frame(rowSums(lung_subset@assays$RNA@counts[top_tfs, ]))
+summary(rowSums(lung_subset@assays$RNA@counts))
+
+# Print the resulting sparse matrix
+# print(overlap_sparse_matrix)
+
+
+
+
+
 
 #### 5. Run analysis on expression data ####
 
@@ -282,11 +320,20 @@ lung_object <- readRDS("output/preprocessing/lung_filter.rds")
 Idents(lung_object) <- "cell_type"
 
 ##### Calculate sum of expression for each gene in each cell type #####
-blood_sum_exp <- Seurat::AggregateExpression(blood_object)[[1]]
-lung_sum_exp <- Seurat::AggregateExpression(lung_object)[[1]]
 
-blood_sum_exp <- Seurat::AverageExpression(blood_object)[[1]]
-lung_sum_exp <- Seurat::AverageExpression(lung_object)[[1]]
+calculate_expression_sum <- function(object) {
+    sums <- list()
+    for (type in levels(Idents(object))) {
+        subset_object <- subset(object, idents = type)
+        sum_exp <- rowSums(subset_object@assays$RNA@counts) # Take summed expression of gene per celltype
+        sums[[type]] <- sum_exp
+    }
+    sums <- do.call(cbind, sums) # Combine list elements into a data frame
+    return(sums)
+}
+
+blood_sum_exp <- calculate_expression_sum(blood_object)
+lung_sum_exp <- calculate_expression_sum(lung_object)
 
 colnames(blood_sum_exp) <- paste0("blood_", colnames(blood_sum_exp))
 colnames(lung_sum_exp) <- paste0("lung_", colnames(lung_sum_exp))
@@ -297,7 +344,7 @@ cor_exp_matrix <- cor(combined_exp_matrix[, -1], use = "pairwise.complete.obs")
 cor_exp_long <- as.data.frame(as.table(cor_exp_matrix))
 difference_long <- as.data.frame(as.table(cor_indegree_matrix - cor_exp_matrix))
 
-cor_exp_plot <- plot_correlation_matrix(cor_exp_long, title = "Correlation Matrix of Expression")
+cor_exp_plot <- plot_correlation_matrix(cor_exp_long, title = "Correlation Matrix of Expression", from_zero = TRUE)
 ggsave("output/analysis/correlation/correlation_matrix_expression.pdf", cor_exp_plot, width = 12, height = 6)
 cor_dif_plot <- plot_correlation_matrix(difference_long, title = "Difference in Correlation Matrix of Indegrees and Expression")
 ggsave("output/analysis/correlation/correlation_matrices_difference.pdf", cor_dif_plot, width = 12, height = 6)

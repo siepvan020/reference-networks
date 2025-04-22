@@ -19,6 +19,7 @@ library(Matrix)
 library(dplyr)
 library(stringr)
 library(Seurat)
+library(uwot)
 # library(biomaRt)
 
 # Set working directory
@@ -52,6 +53,46 @@ lung_indegrees <- calculate_indegrees(lung_output, "lung")
 # Combine blood and lung indegrees and outdegrees into one dataframe
 combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees)) # , fat_indegrees, kidney_indegrees, liver_indegrees))
 
+
+# try-out function to make pca and umap plots of indegrees and expression
+perform_dimensionality_reduction <- function(data, output_prefix, analysis_type, n_neighbors = 15, min_dist = 0.1) {
+    # Prepare matrix
+    mat <- as.matrix(data[complete.cases(data), -1])
+    rownames(mat) <- data$gene[complete.cases(data)]
+
+    # Perform PCA
+    pca_res <- prcomp(t(mat), center = TRUE, scale. = TRUE)
+    pca_df <- as.data.frame(pca_res$x)
+    pca_df$network <- rownames(pca_res$x)
+
+    # Perform UMAP
+    umap_res <- umap(mat, n_neighbors = n_neighbors, min_dist = min_dist)
+    umap_df <- as.data.frame(umap_res)
+    colnames(umap_df) <- c("UMAP1", "UMAP2")
+    umap_df$network <- rownames(mat)
+
+    # Plot PCA
+    pca_plot <- ggplot(pca_df, aes(x = PC1, y = PC2, label = network)) +
+        geom_point(shape = 21, fill = "steelblue", color = "black", size = 3) +
+        geom_text_repel(size = 3, max.overlaps = 10) +
+        labs(x = "PC1", y = "PC2", title = paste("PCA of", analysis_type)) +
+        theme_minimal()
+    ggsave(paste0("output/analysis/dimreduction/", output_prefix, "_pca.pdf"), pca_plot, width = 12, height = 6)
+
+    # Plot UMAP
+    umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2)) +
+        geom_point(shape = 21, fill = "steelblue", color = "black", size = 3) +
+        labs(x = "UMAP1", y = "UMAP2", title = paste("UMAP of", analysis_type)) +
+        theme_minimal()
+    ggsave(paste0("output/analysis/dimreduction/", output_prefix, "_umap.pdf"), umap_plot, width = 12, height = 6)
+
+    return(list(pca = pca_df, umap = umap_df))
+}
+
+indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees")
+exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression") # run this after the expression data is calculated
+
+
 # Calculate correlation matrix
 cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.obs")
 
@@ -59,7 +100,7 @@ cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.ob
 cor_long <- as.data.frame(as.table(cor_indegree_matrix))
 
 # Function to plot the correlation matrix with values in the tiles
-plot_correlation_matrix <- function(data, title = "Correlation Matrix", from_zero = FALSE) {
+plot_correlation_matrix <- function(data, title = "Correlation Matrix", gradient_limits = c(NA, NA)) {
     ggplot(data, aes(Var1, Var2, fill = Freq)) +
         geom_tile(na.rm = TRUE) +
         geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
@@ -67,7 +108,7 @@ plot_correlation_matrix <- function(data, title = "Correlation Matrix", from_zer
             low = "white",
             high = "steelblue",
             name = "Pearson's r value",
-            limits = if (from_zero) c(0, 1) else NULL
+            limits = if (all(is.na(gradient_limits))) NULL else gradient_limits
         ) +
         theme_minimal() +
         theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
@@ -88,7 +129,8 @@ comparisons <- list(
     list(name = "lung_cd4_vs_cd8", x = "lung_cd4_positive_t_cell", y = "lung_cd8_positive_t_cell"),
     list(name = "lung_cd4_vs_monocyte", x = "lung_cd4_positive_t_cell", y = "lung_monocyte"),
     list(name = "lung_cd8_vs_monocyte", x = "lung_cd8_positive_t_cell", y = "lung_monocyte"),
-    list(name = "blood_platelet_vs_lung_2pneumo", x = "blood_platelet", y = "lung_type_ii_pneumocyte")
+    list(name = "blood_platelet_vs_lung_2pneumo", x = "blood_platelet", y = "lung_type_ii_pneumocyte"),
+    list(name = "blood_monocyte_vs_lung_2pneumo", x = "blood_monocyte", y = "lung_type_ii_pneumocyte")
 )
 
 # Function to fit linear model and extract + rank residuals descending
@@ -99,7 +141,7 @@ calculate_residuals <- function(data, x_con, y_con) {
     return(list(fit = fit, residuals = res[order(-res)])) # Return fit and ranked residuals
 }
 
-plot_linear_regression <- function(data, x_con, y_con, comp_name, residuals, fit) {
+plot_linear_regression <- function(data, x_con, y_con, comp_name, residuals, fit, analysis) {
     # Compute prediction intervals
     data$fit <- predict(fit, newdata = data)
 
@@ -128,9 +170,9 @@ plot_linear_regression <- function(data, x_con, y_con, comp_name, residuals, fit
         ) +
         scale_color_identity() +
         labs(
-            title = paste("Linear Regression:", comp_name),
-            x = x_con,
-            y = y_con
+            title = paste("Linear Regression", analysis, ":", comp_name),
+            x = paste(x_con, analysis),
+            y = paste(y_con, analysis)
         ) +
         theme_light() +
         theme(legend.position = "none")
@@ -146,14 +188,14 @@ for (comp in comparisons) {
     result <- calculate_residuals(data, comp$x, comp$y)
     residuals_list[[comp$name]] <- result$residuals
     fit_list[[comp$name]] <- result$fit
-    plot_list[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals, result$fit)
+    plot_list[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals, result$fit, "indegree")
 }
 
 # Save plots of the linear regression models
 ggsave("output/analysis/linear_regression/run3/immune_cells_between_tissues3.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
 ggsave("output/analysis/linear_regression/run3/immune_cells_lung3.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
 ggsave("output/analysis/linear_regression/run3/tissue_specific_linear3.pdf", plot_list[[7]], width = 12, height = 6)
-
+ggsave("output/analysis/linear_regression/run3/blood_monocyte_vs_lung_2pneumo.pdf", plot_list[[8]], width = 12, height = 6)
 
 
 #### 4. Run GSEA on ranked residuals ####
@@ -216,7 +258,7 @@ get_top_pathways <- function(gsea_result) {
         head(10) %>%
         mutate(pathway = factor(pathway, levels = pathway))
 
-    return(list(up = topPathwaysUp, down = topPathwaysDown))
+    return(list(up = topPathwaysUp, down = topPathwaysDown, all = sig_pathways))
 }
 
 # Function to plot top pathways
@@ -243,7 +285,7 @@ plot_top_pathways <- function(topPathways, comparison_name) {
         xlab("NES") +
         ggtitle(paste("Top 10 positively enriched pathways in", comparison_name))
 
-    p2 <- ggplot(topPathways$down, aes(x = NES, y = pathway, size = size, fill = NES)) +
+    p2 <- ggplot(topPathways$down, aes(x = NES, y = reorder(pathway, NES), size = size, fill = NES)) +
         geom_point(shape = 21) +
         scale_size_area(max_size = 10) +
         scale_fill_gradient(low = "blue", high = "white") +
@@ -266,14 +308,14 @@ iteration <- 1
 for (comp in names(gsea_results_indegree)) {
     # Generate plots
     cat("Plotting GSEA results for:", comp, "\n")
-    topPathways <- get_top_pathways(gsea_results_indegree[[comp]])
+    topPathways <- get_top_pathways(gsea_results_indegree[[comp]]) # Returns up, down and all significant pathways
     gsea_plots[[comp]] <- plot_top_pathways(topPathways, comp)
     top_pathways_list[[comp]] <- topPathways
 
     # Save plots
     updotplot <- gsea_plots[[comp]]$up
     downdotplot <- gsea_plots[[comp]]$down
-    # pdf(file = paste0("output/analysis/gsea_dotplots/run3", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
+    # pdf(file = paste0("output/analysis/gsea_dotplots/run3/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
     # print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
     # dev.off()
     iteration <- iteration + 1
@@ -328,7 +370,7 @@ calculate_expression_sum <- function(object) {
         sum_exp <- rowSums(subset_object@assays$RNA@counts) # Take summed expression of gene per celltype
         sums[[type]] <- sum_exp
     }
-    sums <- do.call(cbind, sums) # Combine list elements into a data frame
+    sums <- do.call(cbind, sums) # Combine list elements into a data frame structure
     return(sums)
 }
 
@@ -344,9 +386,9 @@ cor_exp_matrix <- cor(combined_exp_matrix[, -1], use = "pairwise.complete.obs")
 cor_exp_long <- as.data.frame(as.table(cor_exp_matrix))
 difference_long <- as.data.frame(as.table(cor_indegree_matrix - cor_exp_matrix))
 
-cor_exp_plot <- plot_correlation_matrix(cor_exp_long, title = "Correlation Matrix of Expression", from_zero = TRUE)
+cor_exp_plot <- plot_correlation_matrix(cor_exp_long, title = "Correlation Matrix of Expression", gradient_limits = c(0, 1))
 ggsave("output/analysis/correlation/correlation_matrix_expression.pdf", cor_exp_plot, width = 12, height = 6)
-cor_dif_plot <- plot_correlation_matrix(difference_long, title = "Difference in Correlation Matrix of Indegrees and Expression")
+cor_dif_plot <- plot_correlation_matrix(difference_long, title = "Difference in Correlation Matrix of Indegrees and Expression", gradient_limits = c(min(difference_long$Freq), 1))
 ggsave("output/analysis/correlation/correlation_matrices_difference.pdf", cor_dif_plot, width = 12, height = 6)
 
 
@@ -360,13 +402,14 @@ for (comp in comparisons) {
     result <- calculate_residuals(data, comp$x, comp$y)
     gex_residuals[[comp$name]] <- result$residuals
     gex_fit[[comp$name]] <- result$fit
-    gex_plot[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals, result$fit)
+    gex_plot[[comp$name]] <- plot_linear_regression(data, comp$x, comp$y, comp$name, result$residuals, result$fit, "summed expression")
 }
 
 # Save plots of the linear regression models
 ggsave("output/analysis/linear_regression/gex/immune_cells_between_tissues.pdf", patchwork::wrap_plots(A = gex_plot[[1]], B = gex_plot[[2]], C = gex_plot[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
 ggsave("output/analysis/linear_regression/gex/immune_cells_lung.pdf", patchwork::wrap_plots(A = gex_plot[[4]], B = gex_plot[[5]], C = gex_plot[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
 ggsave("output/analysis/linear_regression/gex/tissue_specific_linear.pdf", gex_plot[[7]], width = 12, height = 6)
+ggsave("output/analysis/linear_regression/gex/blood_monocyte_vs_lung_2pneumo.pdf", gex_plot[[8]], width = 12, height = 6)
 
 # Run GSEA on the expression data
 gsea_results_gex <- run_gsea(gex_residuals)
@@ -390,67 +433,3 @@ for (comp in names(gsea_results_gex)) {
     dev.off()
     iteration <- iteration + 1
 }
-
-
-table(stringr::str_extract(names(gex_residuals[[5]]), "ENSG[0-9]+.[0-9]+"))
-
-table(grepl("ENSG[0-9]+.[0-9]+", names(gex_residuals[[5]])))
-
-table(grepl("^ENSG[0-9]+\\.[0-9]+$", names(gex_residuals[[5]])))
-
-
-
-
-
-
-
-
-
-
-
-#### GSEA testing stuff ####
-
-# Extract the first pathway name
-first_pathway <- gsea_results[[1]]$pathway[1]
-
-# Extract the ranked gene list for the first comparison
-ranked_genes <- residuals_list[[names(residuals_list)[1]]]
-ranked_genes <- sort(ranked_genes, decreasing = TRUE) # Ensure it's sorted
-
-# Plot the enrichment for the first pathway
-plotEnrichment(
-    pathway = msigdb_BP_list[["GOBP_TRNA_METABOLIC_PROCESS"]], # Get gene set for first pathway
-    stats = ranked_genes
-) + labs(title = paste("Enrichment Plot:", first_pathway))
-
-top_genes <- names(residuals_list[[7]])[1:1000] # Take the top 1000 most deviated genes
-neg_genes <- names(rev(residuals_list[[7]]))[1:1000]
-
-missing_top_genes <- setdiff(top_genes, msigdb_BP$gene_symbol)
-missing_neg_genes <- setdiff(neg_genes, msigdb_BP$gene_symbol)
-
-mf_missing_top_genes <- setdiff(top_genes, msigdb_MF$gene_symbol)
-mf_missing_neg_genes <- setdiff(neg_genes, msigdb_MF$gene_symbol)
-
-length(missing_top_genes) # How many top genes are missing?
-length(missing_neg_genes) # How many bottom genes are missing?
-head(missing_top_genes) # See which ones
-head(missing_neg_genes) # See which ones
-
-library(biomaRt)
-
-# Connect to Ensembl
-ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-
-# Get gene biotypes for missing genes
-gene_annotations <- getBM(
-    attributes = c("external_gene_name", "gene_biotype"),
-    filters = "external_gene_name",
-    values = names(head(residuals_list[[1]], 1000)), # or missing_neg_genes
-    mart = ensembl
-)
-
-# Check how many are lncRNAs
-lncRNAs <- subset(gene_annotations, gene_biotype == "lncRNA")
-prcoding <- subset(gene_annotations, gene_biotype == "protein_coding")
-head(prcoding)

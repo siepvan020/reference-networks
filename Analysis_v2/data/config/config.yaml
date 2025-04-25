@@ -1,0 +1,103 @@
+blood:
+  file: TS_v2_Blood.rds
+  cells:
+    monocyte:
+      - classical monocyte
+      - non-classical monocyte
+      - intermediate monocyte
+      - monocyte
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+      - naive thymus-derived CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    b_cell:
+      - B cell
+    macrophage: 
+    platelet: 
+lung:
+  file: TS_v2_Lung.rds
+  cells:
+    monocyte:
+      - classical monocyte
+      - non-classical monocyte
+      - intermediate monocyte
+      - monocyte
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    b_cell:
+      - B cell
+    macrophage: 
+    type_ii_pneumocyte:
+      - pulmonary alveolar type 2 cell
+fat:
+  file: TS_v2_Fat.rds
+  cells:
+    monocyte:
+      - classical monocyte
+      - non-classical monocyte
+      - intermediate monocyte
+      - monocyte
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    b_cell:
+      - B cell
+    macrophage: 
+    adipose_stem_cell:
+      - mesenchymal stem cell of adipose tissue
+kidney:
+  file: TS_v2_Kidney.rds
+  cells:
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    b_cell:
+      - B cell
+    macrophage: 
+    kidney_epithelial_cell:
+      - kidney epithelial cell
+liver:
+  file: TS_v2_Liver.rds
+  cells:
+    monocyte:
+      - classical monocyte
+      - non-classical monocyte
+      - intermediate monocyte
+      - monocyte
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    macrophage: 
+    hepatocyte: 
+s_intestine:
+  file: TS_v2_Small_intestine.rds
+  cells:
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+      - naive thymus-derived CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    b_cell:
+      - B cell
+    paneth_cell:
+      - paneth cell of epithelium of small intestine
+l_intestine:
+  file: TS_v2_Large_intestine.rds
+  cells:
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+      - naive thymus-derived CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    b_cell:
+      - B cell
+    macrophage:
+      - colon macrophage
+    enterocyte:
+      - enterocyte of epithelium of large intestine

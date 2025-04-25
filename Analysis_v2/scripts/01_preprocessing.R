@@ -22,9 +22,11 @@ setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 #### 1. Load data ####
 blood_object <- readRDS("data/rds/TS_v2_Blood.rds")
 lung_object <- readRDS("data/rds/TS_v2_Lung.rds")
-# fat_object <- readRDS("data/rds/TS_v2_Fat.rds")
-# kidney_object <- readRDS("data/rds/TS_v2_Kidney.rds")
-# liver_object <- readRDS("data/rds/TS_v2_Liver.rds")
+fat_object <- readRDS("data/rds/TS_v2_Fat.rds")
+kidney_object <- readRDS("data/rds/TS_v2_Kidney.rds")
+liver_object <- readRDS("data/rds/TS_v2_Liver.rds")
+s_intestine_object <- readRDS("data/rds/TS_v2_Small_intestine.rds")
+l_intestine_object <- readRDS("data/rds/TS_v2_Large_intestine.rds")
 cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
@@ -50,28 +52,31 @@ merge_cell_types <- function(object, cell_type_mappings) {
 blood_mappings <- list(
     "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
     "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell", "naive thymus-derived CD4-positive, alpha-beta T cell"),
-    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell")
+    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
+    "b_cell" = c("B cell")
 )
 
 lung_mappings <- list(
     "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
     "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
     "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "type_ii_pneumocyte" = c("pulmonary alveolar type 2 cell")
+    "type_ii_pneumocyte" = c("pulmonary alveolar type 2 cell"),
+    "b_cell" = c("B cell")
 )
 
 fat_mappings <- list(
     "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
     "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
     "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "adipose_stem_cell" = c("mesenchymal stem cell of adipose tissue")
+    "adipose_stem_cell" = c("mesenchymal stem cell of adipose tissue"),
+    "b_cell" = c("B cell")
 )
 
 kidney_mappings <- list(
-    "monocyte" = c("non-classical monocyte", "intermediate monocyte", "monocyte"),
     "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
     "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "kidney_epithelial_cell" = c("kidney epithelial cell")
+    "kidney_epithelial_cell" = c("kidney epithelial cell"),
+    "b_cell" = c("B cell")
 )
 
 liver_mappings <- list(
@@ -80,21 +85,47 @@ liver_mappings <- list(
     "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell")
 )
 
+s_intestine_mappings <- list(
+    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell", "naive thymus-derived CD4-positive, alpha-beta T cell"),
+    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
+    "b_cell" = c("B cell"),
+    "paneth_cell" = c("paneth cell of epithelium of small intestine")
+)
+
+l_intestine_mappings <- list(
+    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell", "naive thymus-derived CD4-positive, alpha-beta T cell"),
+    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
+    "b_cell" = c("B cell"),
+    "macrophage" = c("colon macrophage"),
+    "enterocyte" = c("enterocyte of epithelium of large intestine")
+)
+
 # Apply the function to each object
 blood_object <- merge_cell_types(blood_object, blood_mappings)
 lung_object <- merge_cell_types(lung_object, lung_mappings)
 fat_object <- merge_cell_types(fat_object, fat_mappings)
 kidney_object <- merge_cell_types(kidney_object, kidney_mappings)
 liver_object <- merge_cell_types(liver_object, liver_mappings)
+s_intestine_object <- merge_cell_types(s_intestine_object, s_intestine_mappings)
+l_intestine_object <- merge_cell_types(l_intestine_object, l_intestine_mappings)
 
 
 #### 3. Filter only relevant cell types ####
-common_celltypes <- c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte")
-cells_to_keep_blood <- rownames(blood_object@meta.data[blood_object@meta.data$cell_type %in% append(common_celltypes, "platelet"), ])
-cells_to_keep_lung <- rownames(lung_object@meta.data[lung_object@meta.data$cell_type %in% append(common_celltypes, "type_ii_pneumocyte"), ])
-cells_to_keep_fat <- rownames(fat_object@meta.data[fat_object@meta.data$cell_type %in% append(common_celltypes, "adipose_stem_cell"), ])
-cells_to_keep_kidney <- rownames(kidney_object@meta.data[kidney_object@meta.data$cell_type %in% append(common_celltypes, "kidney_epithelial_cell"), ])
-cells_to_keep_liver <- rownames(liver_object@meta.data[liver_object@meta.data$cell_type %in% append(common_celltypes, "hepatocyte"), ])
+# common_celltypes <- c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage")
+# cells_to_keep_blood <- rownames(blood_object@meta.data[blood_object@meta.data$cell_type %in% append(common_celltypes, "platelet"), ])
+# cells_to_keep_lung <- rownames(lung_object@meta.data[lung_object@meta.data$cell_type %in% append(common_celltypes, "type_ii_pneumocyte"), ])
+# cells_to_keep_fat <- rownames(fat_object@meta.data[fat_object@meta.data$cell_type %in% append(common_celltypes, "adipose_stem_cell"), ])
+# cells_to_keep_kidney <- rownames(kidney_object@meta.data[kidney_object@meta.data$cell_type %in% append(common_celltypes, "kidney_epithelial_cell"), ])
+# cells_to_keep_liver <- rownames(liver_object@meta.data[liver_object@meta.data$cell_type %in% append(common_celltypes, "hepatocyte"), ])
+
+cells_to_keep_blood <- rownames(blood_object@meta.data[blood_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "platelet"), ])
+cells_to_keep_lung <- rownames(lung_object@meta.data[lung_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "type_ii_pneumocyte"), ])
+cells_to_keep_fat <- rownames(fat_object@meta.data[fat_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "adipose_stem_cell"), ])
+cells_to_keep_kidney <- rownames(kidney_object@meta.data[kidney_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "kidney_epithelial_cell"), ])
+cells_to_keep_liver <- rownames(liver_object@meta.data[liver_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "macrophage", "hepatocyte"), ])
+cells_to_keep_s_intestine <- rownames(s_intestine_object@meta.data[s_intestine_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "paneth_cell"), ])
+cells_to_keep_l_intestine <- rownames(l_intestine_object@meta.data[l_intestine_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "enterocyte"), ])
+
 
 # Apply filtering
 blood_object_filter <- blood_object[, cells_to_keep_blood]
@@ -102,6 +133,8 @@ lung_object_filter <- lung_object[, cells_to_keep_lung]
 fat_object_filter <- fat_object[, cells_to_keep_fat]
 kidney_object_filter <- kidney_object[, cells_to_keep_kidney]
 liver_object_filter <- liver_object[, cells_to_keep_liver]
+s_intestine_object_filter <- s_intestine_object[, cells_to_keep_s_intestine]
+l_intestine_object_filter <- l_intestine_object[, cells_to_keep_l_intestine]
 
 # Remove intermediate variables
 # rm(cells_to_keep_blood, cells_to_keep_lung, cells_to_keep_fat, cells_to_keep_kidney, cells_to_keep_liver,
@@ -128,10 +161,10 @@ keep_genes <- !rownames(blood_object_filter) %in% genes_to_exclude
 # Function to update gene names and filter the expression matrix
 update_gene_names_and_filter <- function(object, keep_genes, features) {
 
-    # Subset genes that are not mitochondrial
-    non_mt_genes <- !object@assays$RNA@meta.features$mt
-    non_ensg_genes <- !grepl("^ENSG", features$gene_name)
-    keep_genes <- keep_genes & non_mt_genes & non_ensg_genes
+    # Subset genes that are not mitochondrial and not ENSG IDs
+    non_mt_genes <- !object@assays$RNA@meta.features$mt # To get correct sum of expression PLOT, comment out this line
+    non_ensg_genes <- !grepl("^ENSG", features$gene_name) # To get correct sum of expression PLOT, comment out this line
+    keep_genes <- keep_genes & non_mt_genes & non_ensg_genes # To get correct sum of expression PLOT, comment out this line
 
     # Update gene names and filter duplicates
     filtered_object <- object[keep_genes, ]
@@ -165,6 +198,8 @@ lung_object_filter <- update_gene_names_and_filter(lung_object_filter, keep_gene
 fat_object_filter <- update_gene_names_and_filter(fat_object_filter, keep_genes, features)
 kidney_object_filter <- update_gene_names_and_filter(kidney_object_filter, keep_genes, features)
 liver_object_filter <- update_gene_names_and_filter(liver_object_filter, keep_genes, features)
+s_intestine_object_filter <- update_gene_names_and_filter(s_intestine_object_filter, keep_genes, features)
+l_intestine_object_filter <- update_gene_names_and_filter(l_intestine_object_filter, keep_genes, features)
 cat("- Filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Save the filtered objects
@@ -205,36 +240,45 @@ inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
 # Generate umap before correcting for batch effect
 batch_plots_before <- list(
     blood = inspect_batch_effect(blood_object_filter, "blood", stage = "before"),
-    lung = inspect_batch_effect(lung_object_filter, "lung", stage = "before") # ,
-    # fat = inspect_batch_effect(fat_object_filter, "fat", stage = "before"),
-    # kidney = inspect_batch_effect(kidney_object_filter, "kidney", stage = "before"),
-    # liver = inspect_batch_effect(liver_object_filter, "liver", stage = "before")
+    lung = inspect_batch_effect(lung_object_filter, "lung", stage = "before"),
+    fat = inspect_batch_effect(fat_object_filter, "fat", stage = "before"),
+    kidney = inspect_batch_effect(kidney_object_filter, "kidney", stage = "before"),
+    liver = inspect_batch_effect(liver_object_filter, "liver", stage = "before"),
+    s_intestine = inspect_batch_effect(s_intestine_object_filter, "s_intestine", stage = "before"),
+    l_intestine = inspect_batch_effect(l_intestine_object_filter, "l_intestine", stage = "before")
 )
 
 
 #### 6. Batch correction on counts matrix ####
+cat("- Starting batch correction using ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 # Kidney is not included, as this tissue only has one donor
 blood_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(blood_object_filter@assays$RNA@counts), batch = blood_object_filter$donor_id)
 lung_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(lung_object_filter@assays$RNA@counts), batch = lung_object_filter$donor_id)
 fat_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(fat_object_filter@assays$RNA@counts), batch = fat_object_filter$donor_id)
 liver_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(liver_object_filter@assays$RNA@counts), batch = liver_object_filter$donor_id)
+s_intestine_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(s_intestine_object_filter@assays$RNA@counts), batch = s_intestine_object_filter$donor_id)
+l_intestine_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(l_intestine_object_filter@assays$RNA@counts), batch = l_intestine_object_filter$donor_id)
 cat("- Batch corrected objects with ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Save the batch-corrected objects
 saveRDS(blood_object_filter, "output/preprocessing/blood_prepped.rds")
 saveRDS(lung_object_filter, "output/preprocessing/lung_prepped.rds")
-# saveRDS(fat_object_filter, "output/preprocessing/fat_prepped.rds")
-# saveRDS(liver_object_filter, "output/preprocessing/liver_prepped.rds")
-# saveRDS(kidney_object_filter, "output/preprocessing/kidney_prepped.rds")
+saveRDS(fat_object_filter, "output/preprocessing/fat_prepped.rds")
+saveRDS(liver_object_filter, "output/preprocessing/liver_prepped.rds")
+saveRDS(kidney_object_filter, "output/preprocessing/kidney_prepped.rds")
+saveRDS(s_intestine_object_filter, "output/preprocessing/s_intestine_prepped.rds")
+saveRDS(l_intestine_object_filter, "output/preprocessing/l_intestine_prepped.rds")
 cat("- Saved batch-corrected objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Generate umap after correcting for batch effect
 batch_plots_after <- list(
     blood = inspect_batch_effect(blood_object_filter, "blood", stage = "after"),
-    lung = inspect_batch_effect(lung_object_filter, "lung", stage = "after") # ,
-    # fat = inspect_batch_effect(fat_object_filter, "fat", stage = "after"),
-    # kidney = inspect_batch_effect(kidney_object_filter, "kidney", stage = "after"),
-    # liver = inspect_batch_effect(liver_object_filter, "liver", stage = "after")
+    lung = inspect_batch_effect(lung_object_filter, "lung", stage = "after"),
+    fat = inspect_batch_effect(fat_object_filter, "fat", stage = "after"),
+    kidney = inspect_batch_effect(kidney_object_filter, "kidney", stage = "after"),
+    liver = inspect_batch_effect(liver_object_filter, "liver", stage = "after"),
+    s_intestine = inspect_batch_effect(s_intestine_object_filter, "s_intestine", stage = "after"),
+    l_intestine = inspect_batch_effect(l_intestine_object_filter, "l_intestine", stage = "after")
 )
 
 # Combine before and after batch effect plots for each tissue
@@ -257,7 +301,7 @@ for (tissue in names(batch_plots_before)) {
 }
 
 # Save combined plots to PDF
-pdf("output/preprocessing/plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
+pdf("output/preprocessing/plots/all_tissues_batch_effect_umap2.pdf", width = 10, height = 5)
 for (tissue in names(combined_batch_plots)) {
     print(combined_batch_plots[[tissue]]$combined_donor_plot)
     print(combined_batch_plots[[tissue]]$combined_cell_type_plot)
@@ -317,9 +361,10 @@ generate_gene_expression_plot <- function(df, tissue_name) {
         geom_point() +
         scale_color_manual(values = group_colors) +
         labs(
-            title = paste("Total Gene Expression Across All Cells -", tissue_name),
-            x = "Gene",
-            y = "Sum of expression"
+            title = paste("Total gene expression across subset of cells in", tissue_name),
+            x = "Gene A-Z",
+            y = "Sum of expression",
+            color = "Gene biotype"
         ) +
         theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 
@@ -332,7 +377,9 @@ gene_df <- list(
     lung = get_gene_biotypes(lung_object_filter),
     fat = get_gene_biotypes(fat_object_filter),
     kidney = get_gene_biotypes(kidney_object_filter),
-    liver = get_gene_biotypes(liver_object_filter)
+    liver = get_gene_biotypes(liver_object_filter),
+    s_intestine = get_gene_biotypes(s_intestine_object_filter),
+    l_intestine = get_gene_biotypes(l_intestine_object_filter)
 )
 
 # Generate plots for all tissues
@@ -341,11 +388,13 @@ gex_plots <- list(
     lung = generate_gene_expression_plot(gene_df$lung, "lung"),
     fat = generate_gene_expression_plot(gene_df$fat, "fat"),
     kidney = generate_gene_expression_plot(gene_df$kidney, "kidney"),
-    liver = generate_gene_expression_plot(gene_df$liver, "liver")
+    liver = generate_gene_expression_plot(gene_df$liver, "liver"),
+    s_intestine = generate_gene_expression_plot(gene_df$s_intestine, "s_intestine"),
+    l_intestine = generate_gene_expression_plot(gene_df$l_intestine, "l_intestine")
 )
 
 # Save all expression plots to a single PDF
-pdf("output/preprocessing/plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 5)
+pdf("output/preprocessing/plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 3)
 for (plot in gex_plots) {
     print(plot)
 }

@@ -55,43 +55,50 @@ combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE)
 
 
 # try-out function to make pca and umap plots of indegrees and expression
-perform_dimensionality_reduction <- function(data, output_prefix, analysis_type, n_neighbors = 15, min_dist = 0.1) {
+perform_dimensionality_reduction <- function(data, output_prefix, analysis_type, colsum=NULL, n_neighbors = 8, min_dist = 0.1) {
     # Prepare matrix
     mat <- as.matrix(data[complete.cases(data), -1])
     rownames(mat) <- data$gene[complete.cases(data)]
+    mat <- t(mat)
 
     # Perform PCA
-    pca_res <- prcomp(t(mat), center = TRUE, scale. = TRUE)
+    pca_res <- prcomp(mat, center = TRUE, scale. = TRUE)
     pca_df <- as.data.frame(pca_res$x)
-    pca_df$network <- rownames(pca_res$x)
+    pca_df$condition <- rownames(pca_df)
+    pca_df$counts <- colsum$celltype_exp
 
     # Perform UMAP
-    umap_res <- umap(mat, n_neighbors = n_neighbors, min_dist = min_dist)
+    set.seed(42)
+    umap_res <- umap(pca_df, n_neighbors = n_neighbors, min_dist = min_dist)
     umap_df <- as.data.frame(umap_res)
     colnames(umap_df) <- c("UMAP1", "UMAP2")
-    umap_df$network <- rownames(mat)
+    umap_df$condition <- rownames(umap_df)
+    umap_df$counts <- colsum$celltype_exp
 
-    # Plot PCA
-    pca_plot <- ggplot(pca_df, aes(x = PC1, y = PC2, label = network)) +
-        geom_point(shape = 21, fill = "steelblue", color = "black", size = 3) +
-        geom_text_repel(size = 3, max.overlaps = 10) +
+    # Plot PCA - change pc1 and pc2 to get different plots
+    pca_plot <- ggplot(pca_df, aes(x = PC1, y = PC2, label = condition)) +
+        geom_point(shape = 21, size = 4)+#, aes(fill = log10(counts + 1))) +
+        geom_text_repel(size = 4, max.overlaps = 10) +
+        # scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
         labs(x = "PC1", y = "PC2", title = paste("PCA of", analysis_type)) +
         theme_minimal()
-    ggsave(paste0("output/analysis/dimreduction/", output_prefix, "_pca.pdf"), pca_plot, width = 12, height = 6)
+    ggsave(paste0("output/analysis/dimreduction/pca/", output_prefix, "_pca12.pdf"), pca_plot, width = 12, height = 6)
 
-    # Plot UMAP
-    umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2)) +
-        geom_point(shape = 21, fill = "steelblue", color = "black", size = 3) +
+    umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, label = condition))+#, color = celltype)) +
+        geom_point(shape = 21, size = 4, aes(fill = log10(counts + 1))) +
+        geom_text_repel(size = 4, max.overlaps = 10) +
+        scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
         labs(x = "UMAP1", y = "UMAP2", title = paste("UMAP of", analysis_type)) +
         theme_minimal()
-    ggsave(paste0("output/analysis/dimreduction/", output_prefix, "_umap.pdf"), umap_plot, width = 12, height = 6)
+    ggsave(paste0("output/analysis/dimreduction/umap/", output_prefix, "_umap.pdf"), umap_plot, width = 12, height = 6)
 
-    return(list(pca = pca_df, umap = umap_df))
+    return(list(pca = pca_df, umap = umap_df, mat = mat, pca_res = pca_res))
 }
 
-indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees")
-exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression") # run this after the expression data is calculated
+colsum <- data.frame(celltype_exp = colSums(combined_exp_matrix[complete.cases(combined_exp_matrix), ][, -1])) # run this after the expression data is calculated
 
+indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", colsum) # run this after the expression data is calculated
+exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", colsum) # run this after the expression data is calculated
 
 # Calculate correlation matrix
 cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.obs")
@@ -356,10 +363,13 @@ summary(rowSums(lung_subset@assays$RNA@counts))
 
 #### 5. Run analysis on expression data ####
 
-blood_object <- readRDS("output/preprocessing/blood_filter.rds")
+blood_object <- readRDS("output/preprocessing/correct_input_run3/blood_filter.rds")
 Idents(blood_object) <- "cell_type"
-lung_object <- readRDS("output/preprocessing/lung_filter.rds")
+lung_object <- readRDS("output/preprocessing/correct_input_run3/lung_filter.rds")
 Idents(lung_object) <- "cell_type"
+
+# blood_object[["RNA"]]@data <- sweep(blood_object[["RNA"]]@counts, 2, colSums(blood_object[["RNA"]]@counts), "/") * 1000000
+# lung_object[["RNA"]]@data <- sweep(lung_object[["RNA"]]@counts, 2, colSums(lung_object[["RNA"]]@counts), "/") * 1000000
 
 ##### Calculate sum of expression for each gene in each cell type #####
 
@@ -418,7 +428,6 @@ gsea_results_gex <- run_gsea(gex_residuals)
 gsea_gex_plots <- list()
 gex_top_pathways_list <- list()
 iteration <- 1
-for (comp in names(gsea_results_gex)) {
     # Generate plots
     cat("Plotting GSEA results for:", comp, "\n")
     topPathways <- get_top_pathways(gsea_results_gex[[comp]])

@@ -104,9 +104,12 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
         if (is.null(result)) {
             return(NULL)
         }
+        if ("regNet" %in% names(result)) {
+            result <- result$regNet
+        }
 
         #### - Save and return result ####
-        temp_file <- file.path("output/networks/temp", paste0(cell_type, "_", basename(output_file)))
+        temp_file <- file.path("output/networks/temp/", paste0(cell_type, "_", basename(output_file)))
         save(result, file = temp_file)
 
         # Clear memory
@@ -128,10 +131,10 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
 }
 
 # Run SCORPION for blood
-run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput3.Rdata")
+run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput4.Rdata")
 
 # Run SCORPION for lung
-run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput3.Rdata")
+run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput4.Rdata")
 
 # # Run SCORPION for fat
 # run_scorpion("fat", fat_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "adipose_stem_cell"), "output/networks/final/fatScorpionOutput.Rdata")

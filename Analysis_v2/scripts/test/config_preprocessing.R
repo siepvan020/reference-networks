@@ -29,8 +29,8 @@ setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 config <- yaml::read_yaml("data/config/config.yaml")
 
 
-#### 2. Load data ####
 
+#### 2. Load data & filter cells ####
 # Convert NULL to empty character vector
 .null_to_chr <- function(x) if (is.null(x)) character(0) else x
 
@@ -47,7 +47,7 @@ process_tissue <- function(spec, tissue) {
     object
 }
 
-# Function to merge cell types into a new label
+# Function to merge cell types into a new label based on the config mapping
 merge_cell_types <- function(object, cell_type_mappings) {
     object <- Seurat::DietSeurat(object)
 
@@ -60,7 +60,138 @@ merge_cell_types <- function(object, cell_type_mappings) {
     object@meta.data$cell_type <- as.factor(object@meta.data$cell_type)
     Idents(object) <- "cell_type"
 
-    return(object)
+    object
 }
 
+# Call the process_tissue function for each tissue in the config
 objects <- imap(config, process_tissue)
+
+
+
+#### 3. Filter genes ####
+# Function to update gene names and filter the expression matrix
+update_gene_names_and_filter <- function(object, keep_genes, features) {
+    non_mt <- !object@assays$RNA@meta.features$mt # To get correct sum of expression PLOT, comment out this line
+    non_ensg <- !grepl("^ENSG", features$gene_name) # To get correct sum of expression PLOT, comment out this line
+    keep_vec <- keep_genes & non_mt & non_ensg # To get correct sum of expression PLOT, comment out this line
+
+    obj_filt <- object[keep_vec, ]
+    assay <- obj_filt@assays$RNA
+    new_names <- features$gene_name[keep_vec]
+
+    rownames(assay@meta.features) <- new_names
+    mat <- SeuratObject::GetAssayData(assay)
+    mat@Dimnames[[1]] <- new_names
+    assay@counts <- mat
+    assay@data <- mat
+    obj_filt@assays[["RNA"]] <- assay
+
+    obj_filt <- obj_filt[rowSums(obj_filt) > 0, ]
+    obj_filt
+}
+
+# Extract feature names and Ensembl IDs from the first object in the list,
+# assuming every object has the same features
+template_obj <- objects[[1]]
+features <- data.frame(
+    gene_name  = sub("_ENSG[0-9]+$", "", template_obj@assays$RNA@meta.features$feature_name),
+    ensembl_id = rownames(template_obj)
+)
+
+# Identify duplicate gene names as not all ENSG IDs are unique
+dup_ids <- features$gene_name[duplicated(features$gene_name) | duplicated(features$gene_name, fromLast = TRUE)]
+genes_to_exclude <- unique(features$ensembl_id[features$gene_name %in% dup_ids])
+keep_genes <- !rownames(template_obj) %in% genes_to_exclude
+
+# Apply the gene filtering function to each object in the objects list
+objects <- purrr::map(objects, update_gene_names_and_filter, keep_genes, features)
+
+# Function to generate UMAP plot to visualize the batch effect
+inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
+    stage <- match.arg(stage)
+
+    # Set reduction name based on stage
+    reduction_name <- if (stage == "before") "umap_before" else "umap_after"
+
+    # Run Seurat steps
+    object <- Seurat::FindVariableFeatures(object, verbose = FALSE)
+    object <- Seurat::ScaleData(object, verbose = FALSE)
+    object <- Seurat::RunPCA(object, npcs = 30, verbose = FALSE, reduction.name = paste0("pca_", stage))
+    object <- Seurat::RunUMAP(object, reduction = paste0("pca_", stage), dims = 1:20, reduction.name = reduction_name)
+
+    # Plot UMAP grouped by donor_id
+    plot_donor <- Seurat::DimPlot(object, reduction = reduction_name, group.by = "donor_id", pt.size = 0.75) +
+        theme_minimal() +
+        ggtitle(paste(toupper(stage), "Batch Correction -", tissue, "- Donor ID"))
+
+    # Plot UMAP grouped by cell_type
+    plot_cell_type <- Seurat::DimPlot(object, reduction = reduction_name, group.by = "cell_type", pt.size = 0.75) +
+        theme_minimal() +
+        ggtitle(paste(toupper(stage), "Batch Correction -", tissue, "- Cell Type"))
+
+    return(list(plot_donor = plot_donor, plot_cell_type = plot_cell_type))
+}
+
+
+
+#### 4. Create UMAP plots BEFORE batch correction ####
+batch_plots_before <- purrr::imap(
+    objects,
+    ~ inspect_batch_effect(.x, .y, stage = "before")
+)
+
+
+
+#### 5. Batch correction with ComBat_seq
+perform_batch_correction <- function(obj, tissue) {
+    donors <- obj$donor_id
+    if (length(unique(donor_vec)) > 1) { # skip tissues with one donor
+        counts_corr <- sva::ComBat_seq(as.matrix(obj@assays$RNA@counts),
+            batch = donors
+        )
+        obj[["RNA"]]@counts <- counts_corr
+    }
+    obj
+}
+
+objects <- purrr::imap(
+    objects,
+    ~ perform_batch_correction(.x, .y)
+)
+
+
+
+#### 6. Save batch corrected objects ####
+purrr::iwalk(
+    objects,
+    ~ saveRDS(.x, glue::glue("output/preprocessing/{.y}_prepped.rds"))
+)
+
+
+
+#### 7. Create UMAP plots AFTER batch correction ####
+batch_plots_after <- purrr::imap(
+    objects,
+    ~ inspect_batch_effect(.x, .y, stage = "after")
+)
+
+
+
+#### 8. Save UMAP plots to PDF ####
+
+# Combine before and after batch effect plots for each tissue without a loop
+combined_batch_plots <- purrr::imap(
+    batch_plots_before,
+    ~ list(
+        combined_donor_plot = .x$plot_donor + batch_plots_after[[.y]]$plot_donor,
+        combined_cell_type_plot = .x$plot_cell_type + batch_plots_after[[.y]]$plot_cell_type
+    )
+)
+
+# Save combined plots to PDF
+pdf("output/preprocessing/plots/all_tissues_batch_effect_umap2.pdf", width = 10, height = 5)
+for (tissue in names(combined_batch_plots)) {
+    print(combined_batch_plots[[tissue]]$combined_donor_plot)
+    print(combined_batch_plots[[tissue]]$combined_cell_type_plot)
+}
+dev.off()

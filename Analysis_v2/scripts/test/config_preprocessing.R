@@ -29,7 +29,6 @@ setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 config <- yaml::read_yaml("data/config/config.yaml")
 
 
-
 #### 2. Load data & filter cells ####
 # Convert NULL to empty character vector
 .null_to_chr <- function(x) if (is.null(x)) character(0) else x
@@ -65,7 +64,6 @@ merge_cell_types <- function(object, cell_type_mappings) {
 
 # Call the process_tissue function for each tissue in the config
 objects <- imap(config, process_tissue)
-
 
 
 #### 3. Filter genes ####
@@ -133,13 +131,11 @@ inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
 }
 
 
-
 #### 4. Create UMAP plots BEFORE batch correction ####
 batch_plots_before <- purrr::imap(
     objects,
     ~ inspect_batch_effect(.x, .y, stage = "before")
 )
-
 
 
 #### 5. Batch correction with ComBat_seq
@@ -160,7 +156,6 @@ objects <- purrr::imap(
 )
 
 
-
 #### 6. Save batch corrected objects ####
 purrr::iwalk(
     objects,
@@ -168,13 +163,11 @@ purrr::iwalk(
 )
 
 
-
 #### 7. Create UMAP plots AFTER batch correction ####
 batch_plots_after <- purrr::imap(
     objects,
     ~ inspect_batch_effect(.x, .y, stage = "after")
 )
-
 
 
 #### 8. Save UMAP plots to PDF ####
@@ -190,8 +183,83 @@ combined_batch_plots <- purrr::imap(
 
 # Save combined plots to PDF
 pdf("output/preprocessing/plots/all_tissues_batch_effect_umap2.pdf", width = 10, height = 5)
-for (tissue in names(combined_batch_plots)) {
-    print(combined_batch_plots[[tissue]]$combined_donor_plot)
-    print(combined_batch_plots[[tissue]]$combined_cell_type_plot)
+purrr::iwalk(combined_batch_plots, function(plots) {
+    print(plots$combined_donor_plot)
+    print(plots$combined_cell_type_plot)
+  }
+)
+dev.off()
+
+
+#### 9. Generate gene expression scatter plot ####
+
+# Connect to Ensembl
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+# Function to retrieve gene biotypes and prepare data for plotting
+get_gene_biotypes <- function(object_filter) {
+    gene_totals <- rowSums(object_filter)
+    df <- data.frame(
+        gene = rownames(object_filter),
+        sum_exp = gene_totals,
+        stringsAsFactors = FALSE
+    )
+    df$ENSG <- grepl("^ENSG", df$gene)
+
+    # Connect to Ensembl
+    ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+    # Get gene biotypes for non-ensg genes
+    gene_annotations <- getBM(
+        attributes = c("external_gene_name", "gene_biotype"),
+        filters = "external_gene_name",
+        values = df$gene[!df$ENSG],
+        mart = ensembl
+    )
+
+    # Merge annotation with our data frame
+    df <- left_join(df, gene_annotations, by = c("gene" = "external_gene_name"))
+
+    # For ENSG genes, assign a custom label (here, "ENSG")
+    df$gene_biotype <- ifelse(df$ENSG, "ENSG", df$gene_biotype)
+    df$gene_biotype[is.na(df$gene_biotype)] <- "other" # in case any remain NA
+
+    # Create a grouping variable for ENSG genes (custom label), protein_coding, lncRNA, other (any gene not falling in above)
+    df$major_group <- ifelse(df$gene_biotype %in% c("protein_coding", "lncRNA"),
+        df$gene_biotype, df$gene_biotype
+    )
+    # For clarity, ENSG remains "ENSG" and any remaining labels become "other"
+    df$major_group[!(df$major_group %in% c("ENSG", "protein_coding", "lncRNA"))] <- "other"
+
+    return(df)
 }
+
+# Function to generate gene expression scatter plot for a given tissue
+generate_gene_expression_plot <- function(df, tissue_name) {
+    # Define colors for each group
+    group_colors <- c("ENSG" = "red", "protein_coding" = "blue", "lncRNA" = "green", "other" = "black")
+
+    # Plot the gene totals, coloring by the group
+    p <- ggplot(df, aes(x = gene, y = sum_exp, color = major_group)) +
+        geom_point() +
+        scale_color_manual(values = group_colors) +
+        labs(
+            title = paste("Total gene expression across subset of cells in", tissue_name),
+            x = "Gene A-Z",
+            y = "Sum of expression",
+            color = "Gene biotype"
+        ) +
+        theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+    return(p)
+}
+
+# Get gene biotypes and generate expression plots for each tissue
+gene_df   <- purrr::imap(objects, ~ get_gene_biotypes(.x))
+gex_plots <- purrr::imap(gene_df,   ~ generate_gene_expression_plot(.x, .y))
+
+# Save the gene expression scatter plots to a PDF
+pdf("output/preprocessing/plots/all_ti  ssues_raw_exp_scatter.pdf",
+    width = 10,
+    height = 3
+purrr::iwalk(gex_plots, ~ print(.x))
 dev.off()

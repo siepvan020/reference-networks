@@ -45,9 +45,11 @@ load_seurat_object <- function(file_path) {
 # Load Seurat objects
 blood_object <- load_seurat_object("output/preprocessing/blood_prepped.rds")
 lung_object <- load_seurat_object("output/preprocessing/lung_prepped.rds")
-# fat_object <- load_seurat_object("output/preprocessing/fat_filter.rds")
-# kidney_object <- load_seurat_object("output/preprocessing/kidney_filter.rds")
-# liver_object <- load_seurat_object("output/preprocessing/liver_filter.rds")
+fat_object <- load_seurat_object("output/preprocessing/fat_prepped.rds")
+kidney_object <- load_seurat_object("output/preprocessing/kidney_prepped.rds")
+liver_object <- load_seurat_object("output/preprocessing/liver_prepped.rds")
+s_intestine_object <- load_seurat_object("output/preprocessing/s_intestine_prepped.rds")
+l_intestine_object <- load_seurat_object("output/preprocessing/l_intestine_prepped.rds")
 
 cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
@@ -57,7 +59,7 @@ tf <- read.delim("data/priors/motif_prior_names_2024.tsv", header = FALSE, sep =
 cat("- Loaded priors -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Set up parallel processing
-num_cores <- 4
+num_cores <- 5
 cl <- makeCluster(num_cores)
 registerDoParallel(cl)
 
@@ -131,19 +133,25 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
 }
 
 # Run SCORPION for blood
-run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "platelet"), "output/networks/final/bloodScorpionOutput4.Rdata")
+run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "platelet"), "output/networks/final/bloodScorpionOutput4.Rdata")
 
 # Run SCORPION for lung
-run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput4.Rdata")
+run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput4.Rdata")
 
-# # Run SCORPION for fat
-# run_scorpion("fat", fat_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "adipose_stem_cell"), "output/networks/final/fatScorpionOutput.Rdata")
+# Run SCORPION for fat
+run_scorpion("fat", fat_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "adipose_stem_cell"), "output/networks/final/fatScorpionOutput4.Rdata")
 
-# # Run SCORPION for kidney
-# run_scorpion("kidney", kidney_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "kidney_epithelial_cell"), "output/networks/final/kidneyScorpionOutput.Rdata")
+# Run SCORPION for kidney
+run_scorpion("kidney", kidney_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "kidney_epithelial_cell"), "output/networks/final/kidneyScorpionOutput4.Rdata")
 
-# # Run SCORPION for liver
-# run_scorpion("liver", liver_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "hepatocyte"), "output/networks/final/liverScorpionOutput.Rdata")
+# Run SCORPION for liver
+run_scorpion("liver", liver_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "macrophage", "hepatocyte"), "output/networks/final/liverScorpionOutput4.Rdata")
+
+# Run SCORPION for small intestine
+run_scorpion("s_intestine", s_intestine_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "paneth_cell"), "output/networks/final/s_intestineScorpionOutput4.Rdata")
+
+# Run SCORPION for large intestine
+run_scorpion("l_intestine", l_intestine_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "enterocyte"), "output/networks/final/l_intestineScorpionOutput4.Rdata")
 
 # Stop parallel processing
 stopCluster(cl)

@@ -59,60 +59,84 @@ combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE)
 
 
 # try-out function to make pca and umap plots of indegrees and expression
-perform_dimensionality_reduction <- function(data, output_prefix, analysis_type, colsum=NULL, n_neighbors = 8, min_dist = 0.1) {
+perform_dimensionality_reduction <- function(data, output_prefix, analysis_type, avgsum=NULL, n_neighbors = 8, min_dist = 0.1) {
     # Prepare matrix
-    mat <- as.matrix(data[complete.cases(data), -1])
-    rownames(mat) <- data$gene[complete.cases(data)]
-    mat <- t(mat)
+    mat                 <- as.matrix(data[complete.cases(data), -1])
+    rownames(mat)       <- data$gene[complete.cases(data)]
+    mat                 <- t(mat)
 
     # Perform PCA
-    pca_res <- prcomp(mat, center = TRUE, scale. = TRUE)
-    pca_df <- as.data.frame(pca_res$x)
-    pca_df$condition <- rownames(pca_df)
-    # pca_df$counts <- colsum$celltype_exp
-    pca_df$tissue <- ifelse(grepl("^s_intestine", pca_df$condition), "s_intestine",
-                   ifelse(grepl("^l_intestine", pca_df$condition), "l_intestine",
-                          sub("_.*$", "", pca_df$condition)))
-    pca_df$celltype  <- sub("^s_intestine_|^l_intestine_|^[^_]+_", "", pca_df$condition)
+    pca_res             <- prcomp(mat, center = TRUE, scale. = TRUE)
+    pca_df              <- as.data.frame(pca_res$x)
+    pca_df$condition    <- rownames(pca_df)
+    pca_df$tissue       <- ifelse(grepl("^s_intestine", pca_df$condition), "s_intestine", 
+                                ifelse(grepl("^l_intestine", pca_df$condition), "l_intestine", 
+                                sub("_.*$", "", pca_df$condition)))
+    pca_df$celltype     <- sub("^s_intestine_|^l_intestine_|^[^_]+_", "", pca_df$condition)
+    if (!is.null(avgsum)) { pca_df$counts <- avgsum$celltype_exp }
 
     # Perform UMAP
     set.seed(42)
-    umap_res <- umap(pca_df, n_neighbors = n_neighbors, min_dist = min_dist)
-    umap_df <- as.data.frame(umap_res)
-    colnames(umap_df) <- c("UMAP1", "UMAP2")
-    umap_df$condition <- rownames(umap_df)
-    # umap_df$counts <- colsum$celltype_exp
-    umap_df$tissue    <- pca_df$tissue
-    umap_df$celltype  <- pca_df$celltype
+    umap_res            <- umap(pca_df, n_neighbors = n_neighbors, min_dist = min_dist)
+    umap_df             <- as.data.frame(umap_res)
+    colnames(umap_df)   <- c("UMAP1", "UMAP2")
+    umap_df$condition   <- rownames(umap_df)
+    umap_df$tissue      <- pca_df$tissue
+    umap_df$celltype    <- pca_df$celltype
+    if (!is.null(avgsum)) { umap_df$counts <- avgsum$celltype_exp }
 
-    # Plot PCA - change pc1 and pc2 to get different plots
-    pca_plot <- ggplot(pca_df, aes(x = PC1, y = PC2, color = tissue))+#, shape = tissue)) +
-        geom_point(size = 4)+#, aes(fill = log10(counts + 1))) +
-        scale_color_discrete(name = "Tissue") +
-        scale_shape_manual(values = 0:25, name = "Cell type") +
-        # geom_text_repel(size = 4, max.overlaps = 10) +
-        # scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
-        labs(x = "PC1", y = "PC2", title = paste("PCA of", analysis_type)) +
+    save_umap <- function(aes_string, suffix, use_gradient = FALSE) {
+        plt <- ggplot(umap_df, aes(UMAP1, UMAP2, color = !!rlang::sym(aes_string))) +
+        geom_point(size = 4) +
+        labs(title = paste("UMAP of", analysis_type, "colored by", aes_string),
+            x = "UMAP1", y = "UMAP2", colour = aes_string, fill = aes_string) +
         theme_minimal()
-    ggsave(paste0("output/analysis/dimreduction/pca/", output_prefix, "_pca12.pdf"), pca_plot, width = 12, height = 6)
 
-    umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = tissue))+#, shape = tissue)) +
-        geom_point(size = 4)+#, aes(fill = log10(counts + 1))) +
-        scale_color_discrete(name = "Tissue") +
-        scale_shape_manual(values = 0:25, name = "Cell type") +
-        # geom_text_repel(size = 4, max.overlaps = 10) +
-        # scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
-        labs(x = "UMAP1", y = "UMAP2", title = paste("UMAP of", analysis_type)) +
-        theme_minimal()
-    ggsave(paste0("output/analysis/dimreduction/umap/", output_prefix, "_umap_tissue.pdf"), umap_plot, width = 12, height = 6)
+        if (use_gradient) {
+            plt <- plt + scale_colour_gradient(low = "white", high = "blue")
+        } else {
+              plt <- plt + scale_colour_discrete()
+        }
+
+        ggsave(paste0("output/analysis/dimreduction/umap/",
+                    output_prefix, "_umap_", suffix, ".pdf"),
+            plt, width = 12, height = 6)
+    }
+
+    save_umap("tissue",   "tissue")
+    save_umap("celltype", "celltype")
+    if (!is.null(avgsum)) {
+        save_umap("counts", "counts", use_gradient = TRUE)
+    }
+
+    # # Plot PCA - change pc1 and pc2 to get different plots
+    # pca_plot <- ggplot(pca_df, aes(x = PC1, y = PC2, color = counts))+#, shape = tissue)) +
+    #     geom_point(size = 4)+#, aes(fill = log10(counts + 1))) +
+    #     # scale_color_discrete(name = "Tissue") +
+    #     # scale_shape_manual(values = 0:25, name = "Cell type") +
+    #     # geom_text_repel(size = 4, max.overlaps = 10) +
+    #     scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
+    #     labs(x = "PC1", y = "PC2", title = paste("PCA of", analysis_type)) +
+    #     theme_minimal()
+    # ggsave(paste0("output/analysis/dimreduction/pca/", output_prefix, "_pca12.pdf"), pca_plot, width = 12, height = 6)
+
+    # umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = counts))+#, shape = tissue)) +
+    #     geom_point(size = 4)+#, aes(fill = log10(counts + 1))) +
+    #     # scale_color_discrete(name = "Tissue") +
+    #     # scale_shape_manual(values = 0:25, name = "Cell type") +
+    #     # geom_text_repel(size = 4, max.overlaps = 10) +
+    #     scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
+    #     labs(x = "UMAP1", y = "UMAP2", title = paste("UMAP of", analysis_type)) +
+    #     theme_minimal()
+    # ggsave(paste0("output/analysis/dimreduction/umap/", output_prefix, "_umap_counts.pdf"), umap_plot, width = 12, height = 6)
 
     return(list(pca = pca_df, umap = umap_df, mat = mat, pca_res = pca_res))
 }
 
-colsum <- data.frame(celltype_exp = colSums(combined_exp_matrix[complete.cases(combined_exp_matrix), ][, -1])) # run this after the expression data is calculated
+avgsum <- data.frame(celltype_exp = colSums(combined_exp_matrix[complete.cases(combined_exp_matrix), ][, -1])) # run this after the expression data is calculated
 
-indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees")#, colsum) # run this after the expression data is calculated
-exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", colsum) # run this after the expression data is calculated
+indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", avgsum) # run this after the expression data is calculated
+exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", avgsum) # run this after the expression data is calculated
 
 # Calculate correlation matrix
 cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.obs")
@@ -378,54 +402,57 @@ summary(rowSums(lung_subset@assays$RNA@counts))
 #### 5. Run analysis on expression data ####
 
 blood_object <- readRDS("output/preprocessing/blood_prepped.rds")
-Idents(blood_object) <- "cell_type"
 lung_object <- readRDS("output/preprocessing/lung_prepped.rds")
-Idents(lung_object) <- "cell_type"
 fat_object <- readRDS("output/preprocessing/fat_prepped.rds")
-Idents(fat_object) <- "cell_type"
 kidney_object <- readRDS("output/preprocessing/kidney_prepped.rds")
-Idents(kidney_object) <- "cell_type"
 liver_object <- readRDS("output/preprocessing/liver_prepped.rds")
-Idents(liver_object) <- "cell_type"
 s_intestine_object <- readRDS("output/preprocessing/s_intestine_prepped.rds")
-Idents(s_intestine_object) <- "cell_type"
 l_intestine_object <- readRDS("output/preprocessing/l_intestine_prepped.rds")
-Idents(l_intestine_object) <- "cell_type"
+
+norm_log_cp10k <- function(count_matrix) {
+  lib_size        <- colSums(count_matrix)        # UMIs per cell
+  cp10k           <- sweep(count_matrix, 2, lib_size / 1e4, FUN = "/")
+  log1p(cp10k)
+}
+
+blood_object[["RNA"]]@data <- norm_log_cp10k(blood_object[["RNA"]]@counts)
+lung_object[["RNA"]]@data <- norm_log_cp10k(lung_object[["RNA"]]@counts)
+fat_object[["RNA"]]@data <- norm_log_cp10k(fat_object[["RNA"]]@counts)
+kidney_object[["RNA"]]@data <- norm_log_cp10k(kidney_object[["RNA"]]@counts)
+liver_object[["RNA"]]@data <- norm_log_cp10k(liver_object[["RNA"]]@counts)
+s_intestine_object[["RNA"]]@data <- norm_log_cp10k(s_intestine_object[["RNA"]]@counts)
+l_intestine_object[["RNA"]]@data <- norm_log_cp10k(l_intestine_object[["RNA"]]@counts)
+
 
 # blood_object[["RNA"]]@data <- sweep(blood_object[["RNA"]]@counts, 2, colSums(blood_object[["RNA"]]@counts), "/") * 1000000
 # lung_object[["RNA"]]@data <- sweep(lung_object[["RNA"]]@counts, 2, colSums(lung_object[["RNA"]]@counts), "/") * 1000000
 
 ##### Calculate sum of expression for each gene in each cell type #####
 
-calculate_expression_avg <- function(object) {
-    averages <- list()
-    for (type in levels(Idents(object))) {
-        subset_object <- subset(object, idents = type)
-        avg_exp <- rowMeans(subset_object@assays$RNA@counts) # Take average expression of gene per celltype
-        averages[[type]] <- avg_exp
-    }
-    averages <- do.call(cbind, averages) # Combine list elements into a data frame structure
-    return(averages)
+calculate_expression_avg <- function(object, tissue) {
+  avg_df <- data.frame(gene = rownames(object[["RNA"]]@counts))
+  for (ct in levels(Idents(object))) {
+    ct_subset <- subset(object, idents = ct)
+    avg <- rowMeans(ct_subset[["RNA"]]@counts)
+    avg_df[[paste0(tissue, "_", ct)]] <- avg
+  }
+  avg_df
 }
 
-blood_avg_exp <- calculate_expression_avg(blood_object)
-lung_avg_exp <- calculate_expression_avg(lung_object)
-fat_avg_exp <- calculate_expression_avg(fat_object)
-kidney_avg_exp <- calculate_expression_avg(kidney_object)
-liver_avg_exp <- calculate_expression_avg(liver_object)
-s_intestine_avg_exp <- calculate_expression_avg(s_intestine_object)
-l_intestine_avg_exp <- calculate_expression_avg(l_intestine_object)
+blood_avg_exp <- calculate_expression_avg(blood_object, "blood")
+lung_avg_exp <- calculate_expression_avg(lung_object, "lung")
+fat_avg_exp <- calculate_expression_avg(fat_object, "fat")
+kidney_avg_exp <- calculate_expression_avg(kidney_object, "kidney")
+liver_avg_exp <- calculate_expression_avg(liver_object, "liver")
+s_intestine_avg_exp <- calculate_expression_avg(s_intestine_object, "s_intestine")
+l_intestine_avg_exp <- calculate_expression_avg(l_intestine_object, "l_intestine")
 
-colnames(blood_avg_exp) <- paste0("blood_", colnames(blood_avg_exp))
-colnames(lung_avg_exp) <- paste0("lung_", colnames(lung_avg_exp))
-colnames(fat_avg_exp) <- paste0("fat_", colnames(fat_avg_exp))
-colnames(kidney_avg_exp) <- paste0("kidney_", colnames(kidney_avg_exp))
-colnames(liver_avg_exp) <- paste0("liver_", colnames(liver_avg_exp))
-colnames(s_intestine_avg_exp) <- paste0("s_intestine_", colnames(s_intestine_avg_exp))
-colnames(l_intestine_avg_exp) <- paste0("l_intestine_", colnames(l_intestine_avg_exp))
+# Combine all data frames into one big data frame
+combined_exp_matrix <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE),
+                              list(blood_avg_exp, lung_avg_exp, fat_avg_exp,
+                                   kidney_avg_exp, liver_avg_exp,
+                                   s_intestine_avg_exp, l_intestine_avg_exp))
 
-combined_exp_matrix <- Reduce(function(x, y) merge(x, y, by = "row.names", all = TRUE), list(blood_avg_exp, lung_avg_exp, fat_avg_exp, kidney_avg_exp, liver_avg_exp, s_intestine_avg_exp, l_intestine_avg_exp))
-colnames(combined_exp_matrix)[1] <- "gene"
 cor_exp_matrix <- cor(combined_exp_matrix[, -1], use = "pairwise.complete.obs")
 
 cor_exp_long <- as.data.frame(as.table(cor_exp_matrix))

@@ -26,19 +26,21 @@ library(uwot)
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 #### 1. Load and format data ####
-load("output/networks/final/bloodScorpionOutput3.Rdata")
-load("output/networks/final/lungScorpionOutput3.Rdata")
-# load("final/fatScorpionOutput3.Rdata")
-# load("final/kidneyScorpionOutput3.Rdata")
-# load("final/liverScorpionOutput3.Rdata")
+load("output/networks/final/bloodScorpionOutput4.Rdata")
+load("output/networks/final/lungScorpionOutput4.Rdata")
+load("output/networks/final/fatScorpionOutput4.Rdata")
+load("output/networks/final/kidneyScorpionOutput4.Rdata")
+load("output/networks/final/liverScorpionOutput4.Rdata")
+load("output/networks/final/s_intestineScorpionOutput4.Rdata")
+load("output/networks/final/l_intestineScorpionOutput4.Rdata")
 
 
 #### 2. Calculate indegrees & outdegrees ####
 
 calculate_indegrees <- function(output, tissue_name) {
-    indegrees <- data.frame(gene = colnames(output[[1]]$regNet))
+    indegrees <- data.frame(gene = colnames(output[[1]]))
     for (celltype in names(output)) {
-        regnet <- output[[celltype]]$regNet
+        regnet <- output[[celltype]]
         indegrees[[paste0(tissue_name, "_", celltype)]] <- colSums(regnet)
     }
     return(indegrees)
@@ -46,12 +48,14 @@ calculate_indegrees <- function(output, tissue_name) {
 
 blood_indegrees <- calculate_indegrees(blood_output, "blood")
 lung_indegrees <- calculate_indegrees(lung_output, "lung")
-# fat_indegrees <- calculate_indegrees(fat_output, "fat")
-# kidney_indegrees <- calculate_indegrees(kidney_output, "kidney")
-# liver_indegrees <- calculate_indegrees(liver_output, "liver")
+fat_indegrees <- calculate_indegrees(fat_output, "fat")
+kidney_indegrees <- calculate_indegrees(kidney_output, "kidney")
+liver_indegrees <- calculate_indegrees(liver_output, "liver")
+s_intestine_indegrees <- calculate_indegrees(s_intestine_output, "s_intestine")
+l_intestine_indegrees <- calculate_indegrees(l_intestine_output, "l_intestine")
 
 # Combine blood and lung indegrees and outdegrees into one dataframe
-combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees)) # , fat_indegrees, kidney_indegrees, liver_indegrees))
+combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees, fat_indegrees, kidney_indegrees, liver_indegrees, s_intestine_indegrees, l_intestine_indegrees))
 
 
 # try-out function to make pca and umap plots of indegrees and expression
@@ -65,7 +69,11 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
     pca_res <- prcomp(mat, center = TRUE, scale. = TRUE)
     pca_df <- as.data.frame(pca_res$x)
     pca_df$condition <- rownames(pca_df)
-    pca_df$counts <- colsum$celltype_exp
+    # pca_df$counts <- colsum$celltype_exp
+    pca_df$tissue <- ifelse(grepl("^s_intestine", pca_df$condition), "s_intestine",
+                   ifelse(grepl("^l_intestine", pca_df$condition), "l_intestine",
+                          sub("_.*$", "", pca_df$condition)))
+    pca_df$celltype  <- sub("^s_intestine_|^l_intestine_|^[^_]+_", "", pca_df$condition)
 
     # Perform UMAP
     set.seed(42)
@@ -73,31 +81,37 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
     umap_df <- as.data.frame(umap_res)
     colnames(umap_df) <- c("UMAP1", "UMAP2")
     umap_df$condition <- rownames(umap_df)
-    umap_df$counts <- colsum$celltype_exp
+    # umap_df$counts <- colsum$celltype_exp
+    umap_df$tissue    <- pca_df$tissue
+    umap_df$celltype  <- pca_df$celltype
 
     # Plot PCA - change pc1 and pc2 to get different plots
-    pca_plot <- ggplot(pca_df, aes(x = PC1, y = PC2, label = condition)) +
-        geom_point(shape = 21, size = 4)+#, aes(fill = log10(counts + 1))) +
-        geom_text_repel(size = 4, max.overlaps = 10) +
+    pca_plot <- ggplot(pca_df, aes(x = PC1, y = PC2, color = tissue))+#, shape = tissue)) +
+        geom_point(size = 4)+#, aes(fill = log10(counts + 1))) +
+        scale_color_discrete(name = "Tissue") +
+        scale_shape_manual(values = 0:25, name = "Cell type") +
+        # geom_text_repel(size = 4, max.overlaps = 10) +
         # scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
         labs(x = "PC1", y = "PC2", title = paste("PCA of", analysis_type)) +
         theme_minimal()
     ggsave(paste0("output/analysis/dimreduction/pca/", output_prefix, "_pca12.pdf"), pca_plot, width = 12, height = 6)
 
-    umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, label = condition))+#, color = celltype)) +
-        geom_point(shape = 21, size = 4, aes(fill = log10(counts + 1))) +
-        geom_text_repel(size = 4, max.overlaps = 10) +
-        scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
+    umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = tissue))+#, shape = tissue)) +
+        geom_point(size = 4)+#, aes(fill = log10(counts + 1))) +
+        scale_color_discrete(name = "Tissue") +
+        scale_shape_manual(values = 0:25, name = "Cell type") +
+        # geom_text_repel(size = 4, max.overlaps = 10) +
+        # scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
         labs(x = "UMAP1", y = "UMAP2", title = paste("UMAP of", analysis_type)) +
         theme_minimal()
-    ggsave(paste0("output/analysis/dimreduction/umap/", output_prefix, "_umap.pdf"), umap_plot, width = 12, height = 6)
+    ggsave(paste0("output/analysis/dimreduction/umap/", output_prefix, "_umap_tissue.pdf"), umap_plot, width = 12, height = 6)
 
     return(list(pca = pca_df, umap = umap_df, mat = mat, pca_res = pca_res))
 }
 
 colsum <- data.frame(celltype_exp = colSums(combined_exp_matrix[complete.cases(combined_exp_matrix), ][, -1])) # run this after the expression data is calculated
 
-indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", colsum) # run this after the expression data is calculated
+indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees")#, colsum) # run this after the expression data is calculated
 exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", colsum) # run this after the expression data is calculated
 
 # Calculate correlation matrix
@@ -110,7 +124,7 @@ cor_long <- as.data.frame(as.table(cor_indegree_matrix))
 plot_correlation_matrix <- function(data, title = "Correlation Matrix", gradient_limits = c(NA, NA)) {
     ggplot(data, aes(Var1, Var2, fill = Freq)) +
         geom_tile(na.rm = TRUE) +
-        geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
+        # geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
         scale_fill_gradient(
             low = "white",
             high = "steelblue",
@@ -123,7 +137,7 @@ plot_correlation_matrix <- function(data, title = "Correlation Matrix", gradient
 }
 
 cor_indegree_plot <- plot_correlation_matrix(cor_long, title = "Correlation Matrix of Indegrees")
-ggsave("output/analysis/correlation/run3_correlation_matrix_indegrees", cor_indegree_plot, width = 12, height = 6)
+ggsave("output/analysis/correlation/run4_correlation_matrix_indegrees.pdf", cor_indegree_plot, width = 12, height = 6)
 
 
 #### 3. Calculate linear regression and residuals between conditions ####
@@ -363,33 +377,54 @@ summary(rowSums(lung_subset@assays$RNA@counts))
 
 #### 5. Run analysis on expression data ####
 
-blood_object <- readRDS("output/preprocessing/correct_input_run3/blood_filter.rds")
+blood_object <- readRDS("output/preprocessing/blood_prepped.rds")
 Idents(blood_object) <- "cell_type"
-lung_object <- readRDS("output/preprocessing/correct_input_run3/lung_filter.rds")
+lung_object <- readRDS("output/preprocessing/lung_prepped.rds")
 Idents(lung_object) <- "cell_type"
+fat_object <- readRDS("output/preprocessing/fat_prepped.rds")
+Idents(fat_object) <- "cell_type"
+kidney_object <- readRDS("output/preprocessing/kidney_prepped.rds")
+Idents(kidney_object) <- "cell_type"
+liver_object <- readRDS("output/preprocessing/liver_prepped.rds")
+Idents(liver_object) <- "cell_type"
+s_intestine_object <- readRDS("output/preprocessing/s_intestine_prepped.rds")
+Idents(s_intestine_object) <- "cell_type"
+l_intestine_object <- readRDS("output/preprocessing/l_intestine_prepped.rds")
+Idents(l_intestine_object) <- "cell_type"
 
 # blood_object[["RNA"]]@data <- sweep(blood_object[["RNA"]]@counts, 2, colSums(blood_object[["RNA"]]@counts), "/") * 1000000
 # lung_object[["RNA"]]@data <- sweep(lung_object[["RNA"]]@counts, 2, colSums(lung_object[["RNA"]]@counts), "/") * 1000000
 
 ##### Calculate sum of expression for each gene in each cell type #####
 
-calculate_expression_sum <- function(object) {
-    sums <- list()
+calculate_expression_avg <- function(object) {
+    averages <- list()
     for (type in levels(Idents(object))) {
         subset_object <- subset(object, idents = type)
-        sum_exp <- rowSums(subset_object@assays$RNA@counts) # Take summed expression of gene per celltype
-        sums[[type]] <- sum_exp
+        avg_exp <- rowMeans(subset_object@assays$RNA@counts) # Take average expression of gene per celltype
+        averages[[type]] <- avg_exp
     }
-    sums <- do.call(cbind, sums) # Combine list elements into a data frame structure
-    return(sums)
+    averages <- do.call(cbind, averages) # Combine list elements into a data frame structure
+    return(averages)
 }
 
-blood_sum_exp <- calculate_expression_sum(blood_object)
-lung_sum_exp <- calculate_expression_sum(lung_object)
+blood_avg_exp <- calculate_expression_avg(blood_object)
+lung_avg_exp <- calculate_expression_avg(lung_object)
+fat_avg_exp <- calculate_expression_avg(fat_object)
+kidney_avg_exp <- calculate_expression_avg(kidney_object)
+liver_avg_exp <- calculate_expression_avg(liver_object)
+s_intestine_avg_exp <- calculate_expression_avg(s_intestine_object)
+l_intestine_avg_exp <- calculate_expression_avg(l_intestine_object)
 
-colnames(blood_sum_exp) <- paste0("blood_", colnames(blood_sum_exp))
-colnames(lung_sum_exp) <- paste0("lung_", colnames(lung_sum_exp))
-combined_exp_matrix <- merge(blood_sum_exp, lung_sum_exp, by = "row.names", all = TRUE)
+colnames(blood_avg_exp) <- paste0("blood_", colnames(blood_avg_exp))
+colnames(lung_avg_exp) <- paste0("lung_", colnames(lung_avg_exp))
+colnames(fat_avg_exp) <- paste0("fat_", colnames(fat_avg_exp))
+colnames(kidney_avg_exp) <- paste0("kidney_", colnames(kidney_avg_exp))
+colnames(liver_avg_exp) <- paste0("liver_", colnames(liver_avg_exp))
+colnames(s_intestine_avg_exp) <- paste0("s_intestine_", colnames(s_intestine_avg_exp))
+colnames(l_intestine_avg_exp) <- paste0("l_intestine_", colnames(l_intestine_avg_exp))
+
+combined_exp_matrix <- Reduce(function(x, y) merge(x, y, by = "row.names", all = TRUE), list(blood_avg_exp, lung_avg_exp, fat_avg_exp, kidney_avg_exp, liver_avg_exp, s_intestine_avg_exp, l_intestine_avg_exp))
 colnames(combined_exp_matrix)[1] <- "gene"
 cor_exp_matrix <- cor(combined_exp_matrix[, -1], use = "pairwise.complete.obs")
 

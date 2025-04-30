@@ -20,6 +20,8 @@ library(dplyr)
 library(stringr)
 library(Seurat)
 library(uwot)
+library(tidyr)
+# library(ggthemes) 
 # library(biomaRt)
 
 # Set working directory
@@ -33,7 +35,7 @@ load("output/networks/final/kidneyScorpionOutput4.Rdata")
 load("output/networks/final/liverScorpionOutput4.Rdata")
 load("output/networks/final/s_intestineScorpionOutput4.Rdata")
 load("output/networks/final/l_intestineScorpionOutput4.Rdata")
-
+ 
 
 #### 2. Calculate indegrees & outdegrees ####
 
@@ -58,12 +60,14 @@ l_intestine_indegrees <- calculate_indegrees(l_intestine_output, "l_intestine")
 combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees, fat_indegrees, kidney_indegrees, liver_indegrees, s_intestine_indegrees, l_intestine_indegrees))
 
 
-# try-out function to make pca and umap plots of indegrees and expression
+# Generate PCA and UMAP and plot only UMAP on different conditions
 perform_dimensionality_reduction <- function(data, output_prefix, analysis_type, avgsum=NULL, n_neighbors = 8, min_dist = 0.1) {
     # Prepare matrix
-    mat                 <- as.matrix(data[complete.cases(data), -1])
-    rownames(mat)       <- data$gene[complete.cases(data)]
+    mat                 <- as.matrix(data[, -1])
+    rownames(mat)       <- data$gene
+    mat[is.na(mat)]     <- 0
     mat                 <- t(mat)
+    mat                 <- scale(mat)
 
     # Perform PCA
     pca_res             <- prcomp(mat, center = TRUE, scale. = TRUE)
@@ -74,10 +78,11 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
                                 sub("_.*$", "", pca_df$condition)))
     pca_df$celltype     <- sub("^s_intestine_|^l_intestine_|^[^_]+_", "", pca_df$condition)
     if (!is.null(avgsum)) { pca_df$counts <- avgsum$celltype_exp }
+    umap_input          <- pca_df[, grep("^PC", colnames(pca_df))]
 
     # Perform UMAP
     set.seed(42)
-    umap_res            <- umap(pca_df, n_neighbors = n_neighbors, min_dist = min_dist)
+    umap_res            <- umap(umap_input, n_neighbors = n_neighbors, min_dist = min_dist)
     umap_df             <- as.data.frame(umap_res)
     colnames(umap_df)   <- c("UMAP1", "UMAP2")
     umap_df$condition   <- rownames(umap_df)
@@ -85,70 +90,61 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
     umap_df$celltype    <- pca_df$celltype
     if (!is.null(avgsum)) { umap_df$counts <- avgsum$celltype_exp }
 
-    save_umap <- function(aes_string, suffix, use_gradient = FALSE) {
-        plt <- ggplot(umap_df, aes(UMAP1, UMAP2, color = !!rlang::sym(aes_string))) +
-        geom_point(size = 4) +
-        labs(title = paste("UMAP of", analysis_type, "colored by", aes_string),
-            x = "UMAP1", y = "UMAP2", colour = aes_string, fill = aes_string) +
-        theme_minimal()
+    save_umap <- function(color, shape = NULL, use_gradient = FALSE) {
+
+        mapping <- aes(UMAP1, UMAP2, color = !!rlang::sym(color))
+        if (!use_gradient && !is.null(shape)) {
+            mapping <- modifyList(mapping, aes(shape = !!rlang::sym(shape)))
+        }
+
+        plt <- ggplot(umap_df, mapping) +
+            geom_point(size = 4) +
+            labs(
+                title = paste("UMAP of", analysis_type),
+                x = "UMAP1", y = "UMAP2",
+                colour = color,
+                shape = if (!use_gradient && !is.null(shape)) shape else NULL
+            ) +
+            theme_minimal()
 
         if (use_gradient) {
             plt <- plt + scale_colour_gradient(low = "white", high = "blue")
+            suffix <- "_counts"
         } else {
-              plt <- plt + scale_colour_discrete()
+            plt <- plt + scale_colour_discrete()+
+            scale_shape_manual(values = c(16, 17, 15, 18, 7, 8, 4))
+            suffix <- ""
         }
 
         ggsave(paste0("output/analysis/dimreduction/umap/",
-                    output_prefix, "_umap_", suffix, ".pdf"),
+                    output_prefix, "_umap", suffix, ".pdf"),
             plt, width = 12, height = 6)
     }
 
-    save_umap("tissue",   "tissue")
-    save_umap("celltype", "celltype")
+    save_umap("celltype", "tissue")
     if (!is.null(avgsum)) {
-        save_umap("counts", "counts", use_gradient = TRUE)
+        save_umap("counts", use_gradient = TRUE)
     }
-
-    # # Plot PCA - change pc1 and pc2 to get different plots
-    # pca_plot <- ggplot(pca_df, aes(x = PC1, y = PC2, color = counts))+#, shape = tissue)) +
-    #     geom_point(size = 4)+#, aes(fill = log10(counts + 1))) +
-    #     # scale_color_discrete(name = "Tissue") +
-    #     # scale_shape_manual(values = 0:25, name = "Cell type") +
-    #     # geom_text_repel(size = 4, max.overlaps = 10) +
-    #     scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
-    #     labs(x = "PC1", y = "PC2", title = paste("PCA of", analysis_type)) +
-    #     theme_minimal()
-    # ggsave(paste0("output/analysis/dimreduction/pca/", output_prefix, "_pca12.pdf"), pca_plot, width = 12, height = 6)
-
-    # umap_plot <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = counts))+#, shape = tissue)) +
-    #     geom_point(size = 4)+#, aes(fill = log10(counts + 1))) +
-    #     # scale_color_discrete(name = "Tissue") +
-    #     # scale_shape_manual(values = 0:25, name = "Cell type") +
-    #     # geom_text_repel(size = 4, max.overlaps = 10) +
-    #     scale_fill_gradient(low = "white", high = "blue", name = "Log10 Counts") +
-    #     labs(x = "UMAP1", y = "UMAP2", title = paste("UMAP of", analysis_type)) +
-    #     theme_minimal()
-    # ggsave(paste0("output/analysis/dimreduction/umap/", output_prefix, "_umap_counts.pdf"), umap_plot, width = 12, height = 6)
 
     return(list(pca = pca_df, umap = umap_df, mat = mat, pca_res = pca_res))
 }
 
-avgsum <- data.frame(celltype_exp = colSums(combined_exp_matrix[complete.cases(combined_exp_matrix), ][, -1])) # run this after the expression data is calculated
+indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees")
 
-indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", avgsum) # run this after the expression data is calculated
+avgsum <- data.frame(celltype_exp = colSums(combined_exp_matrix[complete.cases(combined_exp_matrix), ][, -1])) # run this after the expression data is calculated
+indegree_reducs_cnts <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", avgsum) # run this after the expression data is calculated
 exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", avgsum) # run this after the expression data is calculated
 
 # Calculate correlation matrix
 cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.obs")
 
 # Convert the correlation matrix to a long format for ggplot
-cor_long <- as.data.frame(as.table(cor_indegree_matrix))
+cor_indegree_long <- as.data.frame(as.table(cor_indegree_matrix))
 
 # Function to plot the correlation matrix with values in the tiles
-plot_correlation_matrix <- function(data, title = "Correlation Matrix", gradient_limits = c(NA, NA)) {
-    ggplot(data, aes(Var1, Var2, fill = Freq)) +
-        geom_tile(na.rm = TRUE) +
-        # geom_text(aes(label = round(Freq, 3)), color = "black", size = 3, na.rm = TRUE) +
+plot_correlation_matrix <- function(data, title = "Correlation Matrix", gradient_limits = c(NA, NA), labels=FALSE) {
+    plt <- ggplot(data, aes(Var1, Var2, fill = Freq)) +
+        geom_tile() +
         scale_fill_gradient(
             low = "white",
             high = "steelblue",
@@ -158,25 +154,49 @@ plot_correlation_matrix <- function(data, title = "Correlation Matrix", gradient
         theme_minimal() +
         theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
         labs(x = "Cell Types", y = "Cell Types", title = title)
+    if (labels) {
+        plt <- plt + geom_text(aes(label = round(Freq, 3)), color = "black", size = 3)
+    }
+    plt
 }
 
-cor_indegree_plot <- plot_correlation_matrix(cor_long, title = "Correlation Matrix of Indegrees")
+cor_indegree_plot <- plot_correlation_matrix(cor_indegree_long,
+                                             title = "Correlation Matrix of Indegrees"
+                                             )
 ggsave("output/analysis/correlation/run4_correlation_matrix_indegrees.pdf", cor_indegree_plot, width = 12, height = 6)
 
 
 #### 3. Calculate linear regression and residuals between conditions ####
 
+# # Define comparisons
+# comparisons_old <- list(
+#     list(name = "cd4_blood_vs_lung", x = "blood_cd4_positive_t_cell", y = "lung_cd4_positive_t_cell"),
+#     list(name = "cd8_blood_vs_lung", x = "blood_cd8_positive_t_cell", y = "lung_cd8_positive_t_cell"),
+#     list(name = "monocyte_blood_vs_lung", x = "blood_monocyte", y = "lung_monocyte"),
+#     list(name = "lung_cd4_vs_cd8", x = "lung_cd4_positive_t_cell", y = "lung_cd8_positive_t_cell"),
+#     list(name = "lung_cd4_vs_monocyte", x = "lung_cd4_positive_t_cell", y = "lung_monocyte"),
+#     list(name = "lung_cd8_vs_monocyte", x = "lung_cd8_positive_t_cell", y = "lung_monocyte"),
+#     list(name = "blood_platelet_vs_lung_2pneumo", x = "blood_platelet", y = "lung_type_ii_pneumocyte"),
+#     list(name = "blood_monocyte_vs_lung_2pneumo", x = "blood_monocyte", y = "lung_type_ii_pneumocyte")
+# )
+
 # Define comparisons
 comparisons <- list(
-    list(name = "cd4_blood_vs_lung", x = "blood_cd4_positive_t_cell", y = "lung_cd4_positive_t_cell"),
-    list(name = "cd8_blood_vs_lung", x = "blood_cd8_positive_t_cell", y = "lung_cd8_positive_t_cell"),
-    list(name = "monocyte_blood_vs_lung", x = "blood_monocyte", y = "lung_monocyte"),
-    list(name = "lung_cd4_vs_cd8", x = "lung_cd4_positive_t_cell", y = "lung_cd8_positive_t_cell"),
-    list(name = "lung_cd4_vs_monocyte", x = "lung_cd4_positive_t_cell", y = "lung_monocyte"),
-    list(name = "lung_cd8_vs_monocyte", x = "lung_cd8_positive_t_cell", y = "lung_monocyte"),
-    list(name = "blood_platelet_vs_lung_2pneumo", x = "blood_platelet", y = "lung_type_ii_pneumocyte"),
-    list(name = "blood_monocyte_vs_lung_2pneumo", x = "blood_monocyte", y = "lung_type_ii_pneumocyte")
+    list(name = "b_cell_fat_vs_kidney", x = "fat_b_cell", y = "kidney_b_cell"),
+    list(name = "cd4_blood_vs_s_intestine", x = "blood_cd4_positive_t_cell", y = "s_intestine_cd4_positive_t_cell"),
+    list(name = "cd8_l_intestine_vs_liver", x = "l_intestine_cd8_positive_t_cell", y = "liver_cd8_positive_t_cell"),
+    list(name = "monocyte_blood_vs_liver", x = "blood_monocyte", y = "liver_monocyte")
 )
+
+# Add the predefined comparisons indegrees into a dataframe and make correlation matrix
+comp_indegrees <- combined_indegrees[, c("gene", unique(unlist(lapply(comparisons, function(comp) c(comp$x, comp$y))))), drop = FALSE]
+cor_indegree_comp_matrix <- cor(comp_indegrees[, -1], use = "pairwise.complete.obs")
+cor_indegree_comps_long <- as.data.frame(as.table(cor_indegree_comp_matrix))
+
+cor_indegree_comps_plot <- plot_correlation_matrix(cor_indegree_comps_long, 
+                                                   title = "Correlation Matrix of Indegrees of Selected Comparisons",
+                                                   labels = TRUE)
+ggsave("output/analysis/correlation/run4_correlation_matrix_comps_indegrees.pdf", cor_indegree_comps_plot, width = 12, height = 6)
 
 # Function to fit linear model and extract + rank residuals descending
 calculate_residuals <- function(data, x_con, y_con) {
@@ -237,10 +257,16 @@ for (comp in comparisons) {
 }
 
 # Save plots of the linear regression models
-ggsave("output/analysis/linear_regression/run3/immune_cells_between_tissues3.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
-ggsave("output/analysis/linear_regression/run3/immune_cells_lung3.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
-ggsave("output/analysis/linear_regression/run3/tissue_specific_linear3.pdf", plot_list[[7]], width = 12, height = 6)
-ggsave("output/analysis/linear_regression/run3/blood_monocyte_vs_lung_2pneumo.pdf", plot_list[[8]], width = 12, height = 6)
+# ggsave("output/analysis/linear_regression/run3/immune_cells_between_tissues3.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
+# ggsave("output/analysis/linear_regression/run3/immune_cells_lung3.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
+# ggsave("output/analysis/linear_regression/run3/tissue_specific_linear3.pdf", plot_list[[7]], width = 12, height = 6)
+# ggsave("output/analysis/linear_regression/run3/blood_monocyte_vs_lung_2pneumo.pdf", plot_list[[8]], width = 12, height = 6)
+
+ggsave("output/analysis/linear_regression/run4/b_cell_fat_vs_kidney.pdf", plot_list[[1]], width = 12, height = 6)
+ggsave("output/analysis/linear_regression/run4/cd4_blood_vs_s_intestine.pdf", plot_list[[2]], width = 12, height = 6)
+ggsave("output/analysis/linear_regression/run4/cd8_l_intestine_vs_liver.pdf", plot_list[[3]], width = 12, height = 6)
+ggsave("output/analysis/linear_regression/run4/monocyte_blood_vs_liver.pdf", plot_list[[4]], width = 12, height = 6)
+
 
 
 #### 4. Run GSEA on ranked residuals ####
@@ -250,8 +276,8 @@ run_gsea <- function(residuals_list, minSize = 10, maxSize = 500, nproc = 1) {
     options(warn = 1)
 
     # Load gene sets for GO:BP and GO:MF using gene symbols
-    msigdb_BP <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "BP")[, c("gs_name", "gene_symbol")]
-    msigdb_MF <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "MF")[, c("gs_name", "gene_symbol")]
+    msigdb_BP <- msigdbr(species = "Homo sapiens", collection = "C5", subcollection = "BP")[, c("gs_name", "gene_symbol")]
+    msigdb_MF <- msigdbr(species = "Homo sapiens", collection = "C5", subcollection = "MF")[, c("gs_name", "gene_symbol")]
 
     # Convert to fgsea-compatible format (list of gene sets)
     msigdb_BP <- split(msigdb_BP$gene_symbol, msigdb_BP$gs_name)
@@ -360,9 +386,9 @@ for (comp in names(gsea_results_indegree)) {
     # Save plots
     updotplot <- gsea_plots[[comp]]$up
     downdotplot <- gsea_plots[[comp]]$down
-    # pdf(file = paste0("output/analysis/gsea_dotplots/run3/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
-    # print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
-    # dev.off()
+    pdf(file = paste0("output/analysis/gsea_dotplots/run4/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
+        print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
+    dev.off()
     iteration <- iteration + 1
 }
 
@@ -408,24 +434,6 @@ kidney_object <- readRDS("output/preprocessing/kidney_prepped.rds")
 liver_object <- readRDS("output/preprocessing/liver_prepped.rds")
 s_intestine_object <- readRDS("output/preprocessing/s_intestine_prepped.rds")
 l_intestine_object <- readRDS("output/preprocessing/l_intestine_prepped.rds")
-
-norm_log_cp10k <- function(count_matrix) {
-  lib_size        <- colSums(count_matrix)        # UMIs per cell
-  cp10k           <- sweep(count_matrix, 2, lib_size / 1e4, FUN = "/")
-  log1p(cp10k)
-}
-
-blood_object[["RNA"]]@data <- norm_log_cp10k(blood_object[["RNA"]]@counts)
-lung_object[["RNA"]]@data <- norm_log_cp10k(lung_object[["RNA"]]@counts)
-fat_object[["RNA"]]@data <- norm_log_cp10k(fat_object[["RNA"]]@counts)
-kidney_object[["RNA"]]@data <- norm_log_cp10k(kidney_object[["RNA"]]@counts)
-liver_object[["RNA"]]@data <- norm_log_cp10k(liver_object[["RNA"]]@counts)
-s_intestine_object[["RNA"]]@data <- norm_log_cp10k(s_intestine_object[["RNA"]]@counts)
-l_intestine_object[["RNA"]]@data <- norm_log_cp10k(l_intestine_object[["RNA"]]@counts)
-
-
-# blood_object[["RNA"]]@data <- sweep(blood_object[["RNA"]]@counts, 2, colSums(blood_object[["RNA"]]@counts), "/") * 1000000
-# lung_object[["RNA"]]@data <- sweep(lung_object[["RNA"]]@counts, 2, colSums(lung_object[["RNA"]]@counts), "/") * 1000000
 
 ##### Calculate sum of expression for each gene in each cell type #####
 

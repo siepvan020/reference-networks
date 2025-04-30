@@ -108,7 +108,9 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
             theme_minimal()
 
         if (use_gradient) {
-            plt <- plt + scale_colour_gradient(low = "white", high = "blue")
+            plt <- plt + 
+                   scale_colour_gradient(low = "white", high = "blue") + 
+                guides(color=guide_colorbar(title="Mean UMI per cell"))
             suffix <- "_counts"
         } else {
             plt <- plt + scale_colour_discrete()+
@@ -131,7 +133,7 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
 
 indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees")
 
-avgsum <- data.frame(celltype_exp = colSums(combined_exp_matrix[complete.cases(combined_exp_matrix), ][, -1])) # run this after the expression data is calculated
+# avgsum <- data.frame(celltype_exp = colSums(combined_exp_matrix[complete.cases(combined_exp_matrix), ][, -1])) # run this after the expression data is calculated
 indegree_reducs_cnts <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", avgsum) # run this after the expression data is calculated
 exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", avgsum) # run this after the expression data is calculated
 
@@ -435,8 +437,34 @@ liver_object <- readRDS("output/preprocessing/liver_prepped.rds")
 s_intestine_object <- readRDS("output/preprocessing/s_intestine_prepped.rds")
 l_intestine_object <- readRDS("output/preprocessing/l_intestine_prepped.rds")
 
-##### Calculate sum of expression for each gene in each cell type #####
 
+calculate_celltype_depth <- function(object, tissue) {
+  cond_depths <- sapply(levels(Idents(object)), function(ct) {
+    cells <- WhichCells(object, idents = ct)
+    mean(Matrix::colSums(object[["RNA"]]@counts[, cells]))
+  })
+  names(cond_depths) <- paste0(tissue, "_", names(cond_depths))
+  return(cond_depths)
+}
+
+# Per tissue
+blood_depths <- calculate_celltype_depth(blood_object, "blood")
+lung_depths  <- calculate_celltype_depth(lung_object, "lung")
+fat_depths   <- calculate_celltype_depth(fat_object, "fat")
+kidney_depths <- calculate_celltype_depth(kidney_object, "kidney")
+liver_depths <- calculate_celltype_depth(liver_object, "liver")
+s_intestine_depths <- calculate_celltype_depth(s_intestine_object, "s_intestine")
+l_intestine_depths <- calculate_celltype_depth(l_intestine_object, "l_intestine")
+# Combine into one vector
+all_depths <- c(blood_depths, lung_depths, fat_depths,
+                kidney_depths, liver_depths,
+                s_intestine_depths, l_intestine_depths)
+avgsum <- data.frame(celltype_exp = all_depths)
+
+#
+#
+#
+##### Calculate sum of expression for each gene in each cell type #####
 calculate_expression_avg <- function(object, tissue) {
   avg_df <- data.frame(gene = rownames(object[["RNA"]]@counts))
   for (ct in levels(Idents(object))) {
@@ -498,6 +526,7 @@ gsea_results_gex <- run_gsea(gex_residuals)
 gsea_gex_plots <- list()
 gex_top_pathways_list <- list()
 iteration <- 1
+for (comp in names(gsea_results_gex)) {
     # Generate plots
     cat("Plotting GSEA results for:", comp, "\n")
     topPathways <- get_top_pathways(gsea_results_gex[[comp]])

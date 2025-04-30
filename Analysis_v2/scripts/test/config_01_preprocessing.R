@@ -186,8 +186,7 @@ pdf("output/preprocessing/plots/all_tissues_batch_effect_umap2.pdf", width = 10,
 purrr::iwalk(combined_batch_plots, function(plots) {
     print(plots$combined_donor_plot)
     print(plots$combined_cell_type_plot)
-  }
-)
+})
 dev.off()
 
 
@@ -254,12 +253,13 @@ generate_gene_expression_plot <- function(df, tissue_name) {
 }
 
 # Get gene biotypes and generate expression plots for each tissue
-gene_df   <- purrr::imap(objects, ~ get_gene_biotypes(.x))
-gex_plots <- purrr::imap(gene_df,   ~ generate_gene_expression_plot(.x, .y))
+gene_df <- purrr::imap(objects, ~ get_gene_biotypes(.x))
+gex_plots <- purrr::imap(gene_df, ~ generate_gene_expression_plot(.x, .y))
 
 # Save the gene expression scatter plots to a PDF
-pdf("output/preprocessing/plots/all_ti  ssues_raw_exp_scatter.pdf",
+pdf("output/preprocessing/plots/all_tissues_raw_exp_scatter.pdf",
     width = 10,
     height = 3
+)
 purrr::iwalk(gex_plots, ~ print(.x))
 dev.off()

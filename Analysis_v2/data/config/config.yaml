@@ -85,6 +85,7 @@ s_intestine:
       - CD8-positive, alpha-beta T cell
     b_cell:
       - B cell
+    macrophage: 
     paneth_cell:
       - paneth cell of epithelium of small intestine
 l_intestine:

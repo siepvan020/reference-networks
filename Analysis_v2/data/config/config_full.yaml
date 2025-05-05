@@ -1,0 +1,442 @@
+bladder:
+  file: TS_v2_Bladder.rds
+  cells:
+    b_cell:
+      - B cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    fibroblast:
+    macrophage:
+    mast_cell:
+      - mast cell
+    monocyte:
+    myofibroblast:
+      - myofibroblast cell
+    neutrophil:
+    pericyte:
+    plasma_cell:
+      - plasma cell
+    smooth_muscle_cell:
+      - smooth muscle cell
+    vein_endothelial_cell:
+      - vein endothelial cell
+blood:
+  file: TS_v2_Blood.rds
+  cells:
+    b_cell:
+      - B cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+      - naive thymus-derived CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    macrophage: 
+    monocyte:
+      - classical monocyte
+      - non-classical monocyte
+      - intermediate monocyte
+      - monocyte
+    nk_cell:
+      - natural killer cell
+    neutrophil:
+    plasma_cell:
+      - plasma cell
+    platelet:
+bone_marrow:
+  file: TS_v2_Bone_marrow.rds
+  cells:
+    b_cell:
+      - B cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    erythroid_progenitor_cell:
+      - erythroid progenitor cell
+    granulocyte:
+    macrophage:
+    monocyte:
+      - classical monocyte
+      - non-classical monocyte
+      - intermediate monocyte
+      - monocyte
+    nk_cell:
+      - natural killer cell
+    neutrophil:
+    plasma_cell:
+      - plasma cell
+fat:
+  file: TS_v2_Fat.rds
+  cells:
+    adipose_stem_cell:
+      - mesenchymal stem cell of adipose tissue
+    b_cell:
+      - B cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    endothelial_cell:
+      - endothelial cell
+    macrophage: 
+    monocyte:
+      - classical monocyte
+      - non-classical monocyte
+      - intermediate monocyte
+      - monocyte
+    myofibroblast:
+      - myofibroblast cell
+    nk_cell:
+      - natural killer cell
+    neutrophil:
+    pericyte:
+    plasma_cell:
+      - plasma cell
+    smooth_muscle_cell:
+      - smooth muscle cell
+heart:
+  file: TS_v2_Heart.rds
+  cells:
+    artrial_cardiomyocyte:
+      - regular atrial cardiac myocyt
+    cardiac_endothelial_cell:
+      - cardiac endothelial cell
+    cardiac_fibroblast:
+      - fibroblast of cardiac tissue 
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    macrophage:
+    pericyte:
+    smooth_muscle_cell:
+      - smooth muscle cell
+    ventricular_cardiomyocyte:
+      - ventricular cardiac muscle cell
+kidney:
+  file: TS_v2_Kidney.rds
+  cells:
+    b_cell:
+      - B cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    epithelial_cell:
+      - kidney epithelial cell
+    macrophage: 
+l_intestine:
+  file: TS_v2_Large_intestine.rds
+  cells:
+    b_cell:
+      - B cell
+    best4_positive_intestinal_epithelial_cell:
+      - BEST4+ intestinal epithelial cell, human
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+      - naive thymus-derived CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    endothelial_cell:
+      - colon endothelial cell
+    enterocyte:
+      - enterocyte of epithelium of large intestine
+    enteroglial_cell:
+      - enteroglial cell
+    fibroblast:
+    gamma_delta_t_cell:
+      - gamma-delta T cell
+    goblet_cell:
+      - large intestine goblet cell
+    intestinal_crypt_stem_cell:
+      - intestinal crypt stem cell of colon
+    macrophage:
+      - colon macrophage
+    mast_cell:
+      - mast cell
+    paneth_cell:
+      - paneth cell of colon
+    plasma_cell:
+      - plasma cell
+    regulatory_t_cell:
+      - regulatory T cell
+    transit_amplifying_cell:
+      - transit amplifying cell of colon
+    tuft_cell:
+      - tuft cell of colon
+liver:
+  file: TS_v2_Liver.rds
+  cells:
+    b_cell:
+      - B cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    endothelial_cell:
+      - endothelial cell
+    hepatic_stellate_cell:
+      - hepatic stellate cell
+    hepatocyte:
+    intrahepatic_cholangiocyte:
+      - intrahepatic cholangiocyte
+    macrophage:
+    monocyte:
+      - classical monocyte
+      - non-classical monocyte
+      - intermediate monocyte
+      - monocyte
+    nk_cell:
+      - natural killer cell
+    neutrophil:
+    plasma_cell:
+      - plasma cell
+lung:
+  file: TS_v2_Lung.rds
+  cells:
+    adventitial_cell:
+      - adventitial cell
+    alveolar_adventitial_fibroblast:
+      - alveolar adventitial fibroblast
+    artery_endothelial_cell:
+      - endothelial cell of artery
+    basal_cell:
+      - basal cell
+    basophil:
+    b_cell:
+      - B cell
+    capillary_endothelial_cell:
+      - capillary endothelial cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    ciliated_cell:
+      - lung ciliated cell
+    club_cell:
+      - club cell
+    goblet_cell:
+      - respiratory goblet cell
+    lymphatic_vessel_endothelial_cell:
+      - endothelial cell of lymphatic vessel
+    macrophage:
+    monocyte:
+      - classical monocyte
+      - intermediate monocyte
+      - non-classical monocyte
+      - monocyte
+    neutrophil:
+    nk_cell:
+      - natural killer cell
+    pericyte:
+    type_i_pneumocyte:
+      - pulmonary alveolar type 1 cell
+    type_ii_pneumocyte:
+      - pulmonary alveolar type 2 cell
+lymph_node:
+  file: TS_v2_Lymph_node.rds
+  cells:
+    b_cell:
+      - B cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+      - naive thymus-derived CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    innate_lymphoid_cell:
+      - innate lymphoid cell
+    macrophage:
+    mast_cell:
+      - mast cell
+    monocyte:
+      - classical monocyte
+      - intermediate monocyte
+      - non-classical monocyte
+      - monocyte
+    neutrophil:
+    nk_cell:
+      - natural killer cell
+    plasma_cell:
+      - plasma cell
+    regulatory_t_cell:
+      - regulatory T cell
+mammary:
+  file: TS_v2_Mammary.rds
+  cells:
+    basal_cell:
+      - basal cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    endothelial_cell:
+      - endothelial cell
+    fibroblast:
+      - fibroblast of breast
+    luminal_epithelial_cell:
+      - luminal epithelial cell of mammary gland
+    luminal_epithelial_progenitor_cell:
+      - progenitor cell of mammary luminal epithelium
+    macrophage:
+    plasma_cell:
+      - plasma cell
+    vascular_smooth_muscle_cell:
+      - vascular associated smooth muscle cell
+ovary:
+  file: TS_v2_Ovary.rds
+  cells:
+    endothelial_cell:
+      - endothelial cell
+    glandular_epithelial_cell:
+      - glandular epithelial cell
+    macrophage:
+    ovarian_stromal_cell:
+      - stromal cell
+      - stromal cell of ovary
+    ovarian_surface_epithelial_cell:
+      - ovarian surface epithelial cell
+    smooth_muscle_cell:
+      - smooth muscle cell
+    theca_cell:
+      - theca cell
+    vascular_smooth_muscle_cell:
+      - blood vessel smooth muscle cell
+pancreas:
+  file: TS_v2_Pancreas.rds
+  cells:
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    endothelial_cell:
+      - endothelial cell
+    fibroblast:
+    macrophage:
+    monocyte:
+      - classical monocyte
+      - intermediate monocyte
+      - non-classical monocyte
+      - monocyte
+    pancreatic_acinar_cell:
+      - pancreatic acinar cell
+    pancreatic_ductal_cell:
+      - pancreatic ductal cell
+    pancreatic_stellate_cell:
+      - pancreatic stellate cell
+prostate:
+  file: TS_v2_Prostate.rds
+  cells:
+    basal_cell:
+      - basal cell of prostate epithelium
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    endothelial_cell:
+      - endothelial cell
+    fibroblast:
+    luminal_cell:
+      - luminal cell of prostate epithelium
+    macrophage:
+    neutrophil:
+    smooth_muscle_cell:
+      - smooth muscle cell
+skin:
+  file: TS_v2_Skin.rds
+  cells:
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    endothelial_cell:
+      - endothelial cell
+    fibroblast:
+    macrophage:
+    mast_cell:
+      - mast cell
+    neutrophil:
+    regulatory_t_cell:
+      - regulatory T cell
+    smooth_muscle_cell:
+      - smooth muscle cell
+small_intestine:
+  file: TS_v2_Small_intestine.rds
+  cells:
+    b_cell:
+      - B cell
+    best4_positive_intestinal_epithelial_cell:
+      - BEST4+ intestinal epithelial cell, human
+    cd4_positive_t_cell:
+      - activated CD4-positive, alpha-beta T cell
+      - CD4-positive, alpha-beta T cell
+      - naive thymus-derived CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - activated CD8-positive, alpha-beta T cell
+      - CD8-positive, alpha-beta T cell
+    duodenal_enterocyte:
+      - enterocyte of epithelium proper of duodenum
+    enteroendocrine_cell:
+      - enteroendocrine cell of small intestine
+    enterocyte:
+      - enterocyte of epithelium proper of small intestine
+    fibroblast:
+    goblet_cell:
+      - small intestine goblet cell
+    ileal_enterocyte:
+      - enterocyte of epithelium proper of ileum
+    intestinal_crypt_stem_cell:
+      - intestinal crypt stem cell of small intestine
+    jejunal_enterocyte:
+      - enterocyte of epithelium proper of jejunum
+    macrophage:
+    mast_cell:
+      - mast cell
+    paneth_cell:
+      - paneth cell of epithelium of small intestine
+    plasma_cell:
+      - plasma cell
+    tuft_cell:
+      - intestinal tuft cell
+stomach:
+  file: TS_v2_Stomach.rds
+  cells:
+    b_cell:
+      - B cell
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    epithelial_cell:
+      - epithelial cell
+    fibroblast:
+    lymphatic_endothelial_cell:
+      - endothelial cell of lymphatic vessel
+    macrophage:
+    mast_cell:
+      - mast cell
+    monocyte:
+    mononuclear_phagocyte:
+      - mononuclear phagocyte
+    neutrophil:
+    plasma_cell:
+      - plasma cell
+    regulatory_t_cell:
+      - regulatory T cell
+    tissue_resident_macrophage:
+      - tissue-resident macrophage
+uterus:
+  file: TS_v2_Uterus.rds
+  cells:
+    cd4_positive_t_cell:
+      - CD4-positive, alpha-beta T cell
+    cd8_positive_t_cell:
+      - CD8-positive, alpha-beta T cell
+    ciliated_epithelial_cell:
+      - ciliated epithelial cell
+    endothelial_cell:
+      - endothelial cell
+    epithelial_cell:
+      - epithelial cell of uterus  
+    fibroblast:
+    macrophage:
+    myometrial_cell:
+      - myometrial cell
+    pericyte:
+    vascular_smooth_muscle_cell:
+      - vascular associated smooth muscle cell

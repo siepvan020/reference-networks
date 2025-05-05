@@ -46,7 +46,7 @@ process_tissue <- function(spec, tissue) {
         object <- object[, object@meta.data$cell_type %in% names(spec$cells)]
         object
     }, error = function(e) {
-        message(glue("Error processing tissue '{tissue}': {e$message}"))
+        cat(glue("Error processing tissue '{tissue}': {e$message}"), format(Sys.time()), "\n", file = progress_file)
         NULL
     })
 }
@@ -69,6 +69,7 @@ merge_cell_types <- function(object, cell_type_mappings) {
 
 # Call the process_tissue function for each tissue in the config
 objects <- purrr::imap(config, process_tissue)
+cat("- Loaded and cell-filtered Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 3. Filter genes ####
@@ -108,6 +109,7 @@ keep_genes <- !rownames(template_obj) %in% genes_to_exclude
 
 # Apply the gene filtering function to each object in the objects list
 objects <- purrr::map(objects, update_gene_names_and_filter, keep_genes, features)
+cat("- Gene-filtered Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Function to generate UMAP plot to visualize the batch effect
 inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
@@ -139,14 +141,20 @@ inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
 #### 4. Create UMAP plots BEFORE batch correction ####
 batch_plots_before <- purrr::imap(
     objects,
-    ~ inspect_batch_effect(.x, .y, stage = "before")
+    ~ {
+        if (length(unique(.x$donor_id)) > 1) { # Skip tissues with one donor
+            inspect_batch_effect(.x, .y, stage = "before")
+        } else {
+            NULL
+        }
+    }
 )
 
 
-#### 5. Batch correction with ComBat_seq
+#### 5. Batch correction with ComBat_seq ####
 perform_batch_correction <- function(obj, tissue) {
     donors <- obj$donor_id
-    if (length(unique(donor_vec)) > 1) { # skip tissues with one donor
+    if (length(unique(donors)) > 1) { # Skip tissues with one donor
         counts_corr <- sva::ComBat_seq(as.matrix(obj@assays$RNA@counts),
             batch = donors
         )
@@ -155,23 +163,32 @@ perform_batch_correction <- function(obj, tissue) {
     obj
 }
 
+cat("- Starting batch correction using ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 objects <- purrr::imap(
     objects,
     ~ perform_batch_correction(.x, .y)
 )
+cat("- Batch corrected objects with ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 6. Save batch corrected objects ####
 purrr::iwalk(
     objects,
-    ~ saveRDS(.x, glue::glue("output/preprocessing/{.y}_prepped.rds"))
+    ~ saveRDS(.x, glue::glue("output/preprocessing/all/{.y}_prepped.rds"))
 )
+cat("- Saved batch-corrected objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 7. Create UMAP plots AFTER batch correction ####
 batch_plots_after <- purrr::imap(
     objects,
-    ~ inspect_batch_effect(.x, .y, stage = "after")
+    ~ {
+        if (length(unique(.x$donor_id)) > 1) { # Skip tissues with one donor
+            inspect_batch_effect(.x, .y, stage = "after")
+        } else {
+            NULL
+        }
+    }
 )
 
 
@@ -187,7 +204,7 @@ combined_batch_plots <- purrr::imap(
 )
 
 # Save combined plots to PDF
-pdf("output/preprocessing/plots/all_tissues_batch_effect_umap2.pdf", width = 10, height = 5)
+pdf("output/preprocessing/plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
 purrr::iwalk(combined_batch_plots, function(plots) {
     print(plots$combined_donor_plot)
     print(plots$combined_cell_type_plot)

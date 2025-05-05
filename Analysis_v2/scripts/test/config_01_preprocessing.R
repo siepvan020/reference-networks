@@ -26,7 +26,7 @@ library(purrr)
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 # Load config file
-config <- yaml::read_yaml("data/config/config.yaml")
+config <- yaml::read_yaml("data/config/config_full.yaml")
 
 
 #### 2. Load data & filter cells ####
@@ -36,14 +36,19 @@ config <- yaml::read_yaml("data/config/config.yaml")
 # Reads one tissue object, merges and corrects celltype annotations, then
 # keeps only the desired cell types and returns the filtered Seurat object.
 process_tissue <- function(spec, tissue) {
-    object <- readRDS(glue("data/rds/{spec$file}"))
+    tryCatch({
+        object <- readRDS(glue("data/rds/{spec$file}"))
 
-    mappings <- map(spec$cells, .null_to_chr) |> # ensure vectors
-        keep(~ length(.x) > 0) # drop empty ones
+        mappings <- map(spec$cells, .null_to_chr) |> # ensure vectors
+            keep(~ length(.x) > 0) # drop empty ones
 
-    object <- merge_cell_types(object, mappings) # Returns object with updated cell types in metadata
-    object <- object[, object@meta.data$cell_type %in% names(spec$cells)]
-    object
+        object <- merge_cell_types(object, mappings) # Returns object with updated cell types in metadata
+        object <- object[, object@meta.data$cell_type %in% names(spec$cells)]
+        object
+    }, error = function(e) {
+        message(glue("Error processing tissue '{tissue}': {e$message}"))
+        NULL
+    })
 }
 
 # Function to merge cell types into a new label based on the config mapping
@@ -63,7 +68,7 @@ merge_cell_types <- function(object, cell_type_mappings) {
 }
 
 # Call the process_tissue function for each tissue in the config
-objects <- imap(config, process_tissue)
+objects <- purrr::imap(config, process_tissue)
 
 
 #### 3. Filter genes ####

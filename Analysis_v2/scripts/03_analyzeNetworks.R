@@ -185,9 +185,9 @@ ggsave("output/analysis/correlation/run4_correlation_matrix_indegrees.pdf", cor_
 
 # Define comparisons
 comparisons <- list(
-    list(name = "b_cell_fat_vs_kidney", x = "fat_b_cell", y = "kidney_b_cell"),
+    # list(name = "b_cell_fat_vs_kidney", x = "fat_b_cell", y = "kidney_b_cell"),
     list(name = "cd4_blood_vs_s_intestine", x = "blood_cd4_positive_t_cell", y = "s_intestine_cd4_positive_t_cell"),
-    list(name = "cd8_l_intestine_vs_liver", x = "l_intestine_cd8_positive_t_cell", y = "liver_cd8_positive_t_cell"),
+    # list(name = "cd8_l_intestine_vs_liver", x = "l_intestine_cd8_positive_t_cell", y = "liver_cd8_positive_t_cell"),
     list(name = "monocyte_blood_vs_liver", x = "blood_monocyte", y = "liver_monocyte")
 )
 
@@ -222,10 +222,10 @@ plot_linear_regression <- function(data, x_con, y_con, comp_name, residuals, fit
     data$label <- ifelse(data$gene %in% extreme_genes, data$gene, NA)
 
     # Build the plot
-    p <- ggplot(data, aes_string(x = x_con, y = y_con)) +
+    p <- ggplot(data, aes(x = x_con, y = y_con)) +
         geom_point(alpha = 0.5, aes(color = color)) +
         geom_point(data = filter(data, gene %in% extreme_genes), aes(color = color), alpha = 0.75, size = 1.25) +
-        geom_line(aes(y = fit), color = "red", size = 0.75) +
+        geom_line(aes(y = fit), color = "red", linewidth = 0.75) +
         geom_density_2d(color = "gray", alpha = 0.5) +
         geom_text_repel(
             data = filter(data, gene %in% extreme_genes),
@@ -266,9 +266,9 @@ for (comp in comparisons) {
 # ggsave("output/analysis/linear_regression/run3/tissue_specific_linear3.pdf", plot_list[[7]], width = 12, height = 6)
 # ggsave("output/analysis/linear_regression/run3/blood_monocyte_vs_lung_2pneumo.pdf", plot_list[[8]], width = 12, height = 6)
 
-ggsave("output/analysis/linear_regression/run4/b_cell_fat_vs_kidney.pdf", plot_list[[1]], width = 12, height = 6)
+# ggsave("output/analysis/linear_regression/run4/b_cell_fat_vs_kidney.pdf", plot_list[[1]], width = 12, height = 6)
 ggsave("output/analysis/linear_regression/run4/cd4_blood_vs_s_intestine.pdf", plot_list[[2]], width = 12, height = 6)
-ggsave("output/analysis/linear_regression/run4/cd8_l_intestine_vs_liver.pdf", plot_list[[3]], width = 12, height = 6)
+# ggsave("output/analysis/linear_regression/run4/cd8_l_intestine_vs_liver.pdf", plot_list[[3]], width = 12, height = 6)
 ggsave("output/analysis/linear_regression/run4/monocyte_blood_vs_liver.pdf", plot_list[[4]], width = 12, height = 6)
 
 

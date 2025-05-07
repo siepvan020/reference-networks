@@ -141,8 +141,8 @@ inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
 #### 4. Create UMAP plots BEFORE batch correction ####
 batch_plots_before <- purrr::imap(
     objects,
-    ~ {
-        if (length(unique(.x$donor_id)) > 1) { # Skip tissues with one donor
+    function(.x, .y) {
+        if (length(unique(.x$donor_id)) > 1) {
             inspect_batch_effect(.x, .y, stage = "before")
         } else {
             NULL
@@ -151,39 +151,39 @@ batch_plots_before <- purrr::imap(
 )
 
 
-#### 5. Batch correction with ComBat_seq ####
-perform_batch_correction <- function(obj, tissue) {
-    donors <- obj$donor_id
-    if (length(unique(donors)) > 1) { # Skip tissues with one donor
-        counts_corr <- sva::ComBat_seq(as.matrix(obj@assays$RNA@counts),
-            batch = donors
-        )
-        obj[["RNA"]]@counts <- counts_corr
-    }
-    obj
+#### 5. Batch correction with ComBat_seq and save objects ####
+perform_save_batch_correction <- function(obj, tissue) {
+    tryCatch({
+        donors <- obj$donor_id
+        if (length(unique(donors)) > 1) { # Skip tissues with one donor
+            cat(glue("   - Batch correcting {tissue} object"), format(Sys.time()), "\n", file = progress_file, append = TRUE)
+            counts_corr <- sva::ComBat_seq(as.matrix(obj@assays$RNA@counts),
+                batch = donors
+            )
+            obj[["RNA"]]@counts <- counts_corr
+        }
+        saveRDS(obj, glue::glue("output/preprocessing/all/{tissue}_prepped.rds"))
+        cat(glue("   - Saved batch-corrected object for {tissue}"), format(Sys.time()), "\n", file = progress_file, append = TRUE)
+        obj
+    }, error = function(e) {
+        cat(glue("Error processing batch correction for tissue '{tissue}': {e$message}"), format(Sys.time()), "\n", file = progress_file, append = TRUE)
+        NULL
+    })
 }
 
-cat("- Starting batch correction using ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+cat("- Starting batch correction and saving using ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 objects <- purrr::imap(
     objects,
-    ~ perform_batch_correction(.x, .y)
+    ~ perform_save_batch_correction(.x, .y)
 )
-cat("- Batch corrected objects with ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-
-
-#### 6. Save batch corrected objects ####
-purrr::iwalk(
-    objects,
-    ~ saveRDS(.x, glue::glue("output/preprocessing/all/{.y}_prepped.rds"))
-)
-cat("- Saved batch-corrected objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+cat("- Completed batch correction and saving -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
 #### 7. Create UMAP plots AFTER batch correction ####
 batch_plots_after <- purrr::imap(
     objects,
-    ~ {
-        if (length(unique(.x$donor_id)) > 1) { # Skip tissues with one donor
+    function(.x, .y) {
+        if (length(unique(.x$donor_id)) > 1) {
             inspect_batch_effect(.x, .y, stage = "after")
         } else {
             NULL
@@ -215,7 +215,7 @@ dev.off()
 #### 9. Generate gene expression scatter plot ####
 
 # Connect to Ensembl
-ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+# ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 # Function to retrieve gene biotypes and prepare data for plotting
 get_gene_biotypes <- function(object_filter) {
     gene_totals <- rowSums(object_filter)
@@ -274,14 +274,14 @@ generate_gene_expression_plot <- function(df, tissue_name) {
     return(p)
 }
 
-# Get gene biotypes and generate expression plots for each tissue
-gene_df <- purrr::imap(objects, ~ get_gene_biotypes(.x))
-gex_plots <- purrr::imap(gene_df, ~ generate_gene_expression_plot(.x, .y))
+# # Get gene biotypes and generate expression plots for each tissue
+# gene_df <- purrr::imap(objects, ~ get_gene_biotypes(.x))
+# gex_plots <- purrr::imap(gene_df, ~ generate_gene_expression_plot(.x, .y))
 
-# Save the gene expression scatter plots to a PDF
-pdf("output/preprocessing/plots/all_tissues_raw_exp_scatter.pdf",
-    width = 10,
-    height = 3
-)
-purrr::iwalk(gex_plots, ~ print(.x))
-dev.off()
+# # Save the gene expression scatter plots to a PDF
+# pdf("output/preprocessing/plots/all_tissues_raw_exp_scatter.pdf",
+#     width = 10,
+#     height = 3
+# )
+# purrr::iwalk(gex_plots, ~ print(.x))
+# dev.off()

@@ -1,5 +1,8 @@
 #!/usr/bin/env Rscript
 
+
+#### 1. Setup ####
+
 progress_file <- "/div/pythagoras/u1/siepv/siep/Analysis_v2/output/log/preprocess.log"
 
 # Start fresh log or append
@@ -15,24 +18,40 @@ library(dplyr)
 library(ggplot2)
 library(sva)
 
+library(yaml)
+library(glue)
+library(purrr)
+
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
-
-#### 1. Load data ####
-blood_object <- readRDS("data/rds/TS_v2_Blood.rds")
-lung_object <- readRDS("data/rds/TS_v2_Lung.rds")
-fat_object <- readRDS("data/rds/TS_v2_Fat.rds")
-kidney_object <- readRDS("data/rds/TS_v2_Kidney.rds")
-liver_object <- readRDS("data/rds/TS_v2_Liver.rds")
-s_intestine_object <- readRDS("data/rds/TS_v2_Small_intestine.rds")
-l_intestine_object <- readRDS("data/rds/TS_v2_Large_intestine.rds")
-cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+# Load config file
+config <- yaml::read_yaml("data/config/config_full.yaml")
 
 
-#### 2. Correct cell type annotations ####
+#### 2. Load data & filter cells ####
+# Convert NULL to empty character vector
+.null_to_chr <- function(x) if (is.null(x)) character(0) else x
 
-# Function to merge cell types into a new label
+# Reads one tissue object, merges and corrects celltype annotations, then
+# keeps only the desired cell types and returns the filtered Seurat object.
+process_tissue <- function(spec, tissue) {
+    tryCatch({
+        object <- readRDS(glue("data/rds/{spec$file}"))
+
+        mappings <- map(spec$cells, .null_to_chr) |> # ensure vectors
+            keep(~ length(.x) > 0) # drop empty ones
+
+        object <- merge_cell_types(object, mappings) # Returns object with updated cell types in metadata
+        object <- object[, object@meta.data$cell_type %in% names(spec$cells)]
+        object
+    }, error = function(e) {
+        cat(glue("Error processing tissue '{tissue}': {e$message}"), format(Sys.time()), "\n", file = progress_file)
+        NULL
+    })
+}
+
+# Function to merge cell types into a new label based on the config mapping
 merge_cell_types <- function(object, cell_type_mappings) {
     object <- Seurat::DietSeurat(object)
 
@@ -45,173 +64,54 @@ merge_cell_types <- function(object, cell_type_mappings) {
     object@meta.data$cell_type <- as.factor(object@meta.data$cell_type)
     Idents(object) <- "cell_type"
 
-    return(object)
+    object
 }
 
-# Define cell type mappings for each object
-blood_mappings <- list(
-    "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
-    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell", "naive thymus-derived CD4-positive, alpha-beta T cell"),
-    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "b_cell" = c("B cell")
-)
-
-lung_mappings <- list(
-    "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
-    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
-    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "type_ii_pneumocyte" = c("pulmonary alveolar type 2 cell"),
-    "b_cell" = c("B cell")
-)
-
-fat_mappings <- list(
-    "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
-    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
-    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "adipose_stem_cell" = c("mesenchymal stem cell of adipose tissue"),
-    "b_cell" = c("B cell")
-)
-
-kidney_mappings <- list(
-    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
-    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "kidney_epithelial_cell" = c("kidney epithelial cell"),
-    "b_cell" = c("B cell")
-)
-
-liver_mappings <- list(
-    "monocyte" = c("classical monocyte", "non-classical monocyte", "intermediate monocyte", "monocyte"),
-    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell"),
-    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell")
-)
-
-s_intestine_mappings <- list(
-    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell", "naive thymus-derived CD4-positive, alpha-beta T cell"),
-    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "b_cell" = c("B cell"),
-    "paneth_cell" = c("paneth cell of epithelium of small intestine")
-)
-
-l_intestine_mappings <- list(
-    "cd4_positive_t_cell" = c("CD4-positive, alpha-beta T cell", "naive thymus-derived CD4-positive, alpha-beta T cell"),
-    "cd8_positive_t_cell" = c("CD8-positive, alpha-beta T cell"),
-    "b_cell" = c("B cell"),
-    "macrophage" = c("colon macrophage"),
-    "enterocyte" = c("enterocyte of epithelium of large intestine")
-)
-
-# Apply the function to each object
-blood_object <- merge_cell_types(blood_object, blood_mappings)
-lung_object <- merge_cell_types(lung_object, lung_mappings)
-fat_object <- merge_cell_types(fat_object, fat_mappings)
-kidney_object <- merge_cell_types(kidney_object, kidney_mappings)
-liver_object <- merge_cell_types(liver_object, liver_mappings)
-s_intestine_object <- merge_cell_types(s_intestine_object, s_intestine_mappings)
-l_intestine_object <- merge_cell_types(l_intestine_object, l_intestine_mappings)
+# Call the process_tissue function for each tissue in the config
+objects <- purrr::imap(config, process_tissue)
+cat("- Loaded and cell-filtered Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 
-#### 3. Filter only relevant cell types ####
-# common_celltypes <- c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage")
-# cells_to_keep_blood <- rownames(blood_object@meta.data[blood_object@meta.data$cell_type %in% append(common_celltypes, "platelet"), ])
-# cells_to_keep_lung <- rownames(lung_object@meta.data[lung_object@meta.data$cell_type %in% append(common_celltypes, "type_ii_pneumocyte"), ])
-# cells_to_keep_fat <- rownames(fat_object@meta.data[fat_object@meta.data$cell_type %in% append(common_celltypes, "adipose_stem_cell"), ])
-# cells_to_keep_kidney <- rownames(kidney_object@meta.data[kidney_object@meta.data$cell_type %in% append(common_celltypes, "kidney_epithelial_cell"), ])
-# cells_to_keep_liver <- rownames(liver_object@meta.data[liver_object@meta.data$cell_type %in% append(common_celltypes, "hepatocyte"), ])
-
-cells_to_keep_blood <- rownames(blood_object@meta.data[blood_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "platelet"), ])
-cells_to_keep_lung <- rownames(lung_object@meta.data[lung_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "type_ii_pneumocyte"), ])
-cells_to_keep_fat <- rownames(fat_object@meta.data[fat_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "adipose_stem_cell"), ])
-cells_to_keep_kidney <- rownames(kidney_object@meta.data[kidney_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "kidney_epithelial_cell"), ])
-cells_to_keep_liver <- rownames(liver_object@meta.data[liver_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "macrophage", "hepatocyte"), ])
-cells_to_keep_s_intestine <- rownames(s_intestine_object@meta.data[s_intestine_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "paneth_cell"), ])
-cells_to_keep_l_intestine <- rownames(l_intestine_object@meta.data[l_intestine_object@meta.data$cell_type %in% c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "enterocyte"), ])
-
-
-# Apply filtering
-blood_object_filter <- blood_object[, cells_to_keep_blood]
-lung_object_filter <- lung_object[, cells_to_keep_lung]
-fat_object_filter <- fat_object[, cells_to_keep_fat]
-kidney_object_filter <- kidney_object[, cells_to_keep_kidney]
-liver_object_filter <- liver_object[, cells_to_keep_liver]
-s_intestine_object_filter <- s_intestine_object[, cells_to_keep_s_intestine]
-l_intestine_object_filter <- l_intestine_object[, cells_to_keep_l_intestine]
-
-# Remove intermediate variables
-# rm(cells_to_keep_blood, cells_to_keep_lung, cells_to_keep_fat, cells_to_keep_kidney, cells_to_keep_liver,
-#    blood_mappings, lung_mappings, fat_mappings, kidney_mappings, liver_mappings)
-
-
-#### 4. Convert ensembl ids to gene names and remove duplicates ####
-
-# Extract feature names and Ensembl IDs, filtering out gene names matching the regex
-features <- data.frame(
-    gene_name = gsub("_ENSG[0-9]+", "", as.character(blood_object_filter@assays$RNA@meta.features$feature_name)),
-    ensembl_id = as.character(rownames(blood_object_filter))
-)
-
-# Identify duplicate gene names
-duplicates <- features[duplicated(features$gene_name) | duplicated(features$gene_name, fromLast = TRUE), ]
-
-# Get unique Ensembl IDs of duplicates
-genes_to_exclude <- unique(duplicates$ensembl_id)
-
-# Exclude duplicates
-keep_genes <- !rownames(blood_object_filter) %in% genes_to_exclude
-
+#### 3. Filter genes ####
 # Function to update gene names and filter the expression matrix
 update_gene_names_and_filter <- function(object, keep_genes, features) {
+    non_mt <- !object@assays$RNA@meta.features$mt # To get correct sum of expression PLOT, comment out this line
+    non_ensg <- !grepl("^ENSG", features$gene_name) # To get correct sum of expression PLOT, comment out this line
+    keep_vec <- keep_genes & non_mt & non_ensg # To get correct sum of expression PLOT, comment out this line
 
-    # Subset genes that are not mitochondrial and not ENSG IDs
-    non_mt_genes <- !object@assays$RNA@meta.features$mt # To get correct sum of expression PLOT, comment out this line
-    non_ensg_genes <- !grepl("^ENSG", features$gene_name) # To get correct sum of expression PLOT, comment out this line
-    keep_genes <- keep_genes & non_mt_genes & non_ensg_genes # To get correct sum of expression PLOT, comment out this line
+    obj_filt <- object[keep_vec, ]
+    assay <- obj_filt@assays$RNA
+    new_names <- features$gene_name[keep_vec]
 
-    # Update gene names and filter duplicates
-    filtered_object <- object[keep_genes, ]
+    rownames(assay@meta.features) <- new_names
+    mat <- SeuratObject::GetAssayData(assay)
+    mat@Dimnames[[1]] <- new_names
+    assay@counts <- mat
+    assay@data <- mat
+    obj_filt@assays[["RNA"]] <- assay
 
-    assayobj <- filtered_object@assays$RNA
-
-    # List of new gene names
-    new_names <- features$gene_name[keep_genes]
-
-    # Assign new names to the features slot of the temporary object
-    rownames(assayobj@meta.features) <- new_names
-
-    matrix_n <- SeuratObject::GetAssayData(assayobj)
-    matrix_n@Dimnames[[1]] <- new_names
-
-    # Assign new gene names to the temporary object
-    assayobj@counts <- matrix_n
-    assayobj@data <- matrix_n
-
-    # Overwrite the RNA assay of the original object with the updated assay
-    object@assays[["RNA"]] <- assayobj
-
-    object <- object[rowSums(object) > 0, ]
-
-    return(object)
+    obj_filt <- obj_filt[rowSums(obj_filt) > 0, ]
+    obj_filt
 }
 
-# Apply the function to each object
-blood_object_filter <- update_gene_names_and_filter(blood_object_filter, keep_genes, features)
-lung_object_filter <- update_gene_names_and_filter(lung_object_filter, keep_genes, features)
-fat_object_filter <- update_gene_names_and_filter(fat_object_filter, keep_genes, features)
-kidney_object_filter <- update_gene_names_and_filter(kidney_object_filter, keep_genes, features)
-liver_object_filter <- update_gene_names_and_filter(liver_object_filter, keep_genes, features)
-s_intestine_object_filter <- update_gene_names_and_filter(s_intestine_object_filter, keep_genes, features)
-l_intestine_object_filter <- update_gene_names_and_filter(l_intestine_object_filter, keep_genes, features)
-cat("- Filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+# Extract feature names and Ensembl IDs from the first object in the list,
+# assuming every object has the same features
+template_obj <- objects[[1]]
+features <- data.frame(
+    gene_name  = sub("_ENSG[0-9]+$", "", template_obj@assays$RNA@meta.features$feature_name),
+    ensembl_id = rownames(template_obj)
+)
 
-# Save the filtered objects
-# saveRDS(blood_object_filter, "blood_filter.rds")
-# saveRDS(lung_object_filter, "lung_filter.rds")
-# saveRDS(fat_object_filter, "fat_filter.rds")
-# saveRDS(kidney_object_filter, "kidney_filter.rds")
-# saveRDS(liver_object_filter, "liver_filter.rds")
-# cat("- Saved filtered objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+# Identify duplicate gene names as not all ENSG IDs are unique
+dup_ids <- features$gene_name[duplicated(features$gene_name) | duplicated(features$gene_name, fromLast = TRUE)]
+genes_to_exclude <- unique(features$ensembl_id[features$gene_name %in% dup_ids])
+keep_genes <- !rownames(template_obj) %in% genes_to_exclude
 
+# Apply the gene filtering function to each object in the objects list
+objects <- purrr::map(objects, update_gene_names_and_filter, keep_genes, features)
+cat("- Gene-filtered Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
-#### 5. Plot batch effect ####
+# Function to generate UMAP plot to visualize the batch effect
 inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
     stage <- match.arg(stage)
 
@@ -237,82 +137,89 @@ inspect_batch_effect <- function(object, tissue, stage = c("before", "after")) {
     return(list(plot_donor = plot_donor, plot_cell_type = plot_cell_type))
 }
 
-# Generate umap before correcting for batch effect
-batch_plots_before <- list(
-    blood = inspect_batch_effect(blood_object_filter, "blood", stage = "before"),
-    lung = inspect_batch_effect(lung_object_filter, "lung", stage = "before"),
-    fat = inspect_batch_effect(fat_object_filter, "fat", stage = "before"),
-    kidney = inspect_batch_effect(kidney_object_filter, "kidney", stage = "before"),
-    liver = inspect_batch_effect(liver_object_filter, "liver", stage = "before"),
-    s_intestine = inspect_batch_effect(s_intestine_object_filter, "s_intestine", stage = "before"),
-    l_intestine = inspect_batch_effect(l_intestine_object_filter, "l_intestine", stage = "before")
+
+#### 4. Create UMAP plots BEFORE batch correction ####
+batch_plots_before <- purrr::imap(
+    objects,
+    function(.x, .y) {
+        if (length(unique(.x$donor_id)) > 1) {
+            inspect_batch_effect(.x, .y, stage = "before")
+        } else {
+            NULL
+        }
+    }
 )
 
 
-#### 6. Batch correction on counts matrix ####
-cat("- Starting batch correction using ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-# Kidney is not included, as this tissue only has one donor
-blood_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(blood_object_filter@assays$RNA@counts), batch = blood_object_filter$donor_id)
-lung_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(lung_object_filter@assays$RNA@counts), batch = lung_object_filter$donor_id)
-fat_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(fat_object_filter@assays$RNA@counts), batch = fat_object_filter$donor_id)
-liver_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(liver_object_filter@assays$RNA@counts), batch = liver_object_filter$donor_id)
-s_intestine_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(s_intestine_object_filter@assays$RNA@counts), batch = s_intestine_object_filter$donor_id)
-l_intestine_object_filter[["RNA"]]@counts <- sva::ComBat_seq(as.matrix(l_intestine_object_filter@assays$RNA@counts), batch = l_intestine_object_filter$donor_id)
-cat("- Batch corrected objects with ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-
-# Save the batch-corrected objects
-saveRDS(blood_object_filter, "output/preprocessing/blood_prepped.rds")
-saveRDS(lung_object_filter, "output/preprocessing/lung_prepped.rds")
-saveRDS(fat_object_filter, "output/preprocessing/fat_prepped.rds")
-saveRDS(liver_object_filter, "output/preprocessing/liver_prepped.rds")
-saveRDS(kidney_object_filter, "output/preprocessing/kidney_prepped.rds")
-saveRDS(s_intestine_object_filter, "output/preprocessing/s_intestine_prepped.rds")
-saveRDS(l_intestine_object_filter, "output/preprocessing/l_intestine_prepped.rds")
-cat("- Saved batch-corrected objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-
-# Generate umap after correcting for batch effect
-batch_plots_after <- list(
-    blood = inspect_batch_effect(blood_object_filter, "blood", stage = "after"),
-    lung = inspect_batch_effect(lung_object_filter, "lung", stage = "after"),
-    fat = inspect_batch_effect(fat_object_filter, "fat", stage = "after"),
-    kidney = inspect_batch_effect(kidney_object_filter, "kidney", stage = "after"),
-    liver = inspect_batch_effect(liver_object_filter, "liver", stage = "after"),
-    s_intestine = inspect_batch_effect(s_intestine_object_filter, "s_intestine", stage = "after"),
-    l_intestine = inspect_batch_effect(l_intestine_object_filter, "l_intestine", stage = "after")
-)
-
-# Combine before and after batch effect plots for each tissue
-combined_batch_plots <- list()
-
-for (tissue in names(batch_plots_before)) {
-    before_plots <- batch_plots_before[[tissue]]
-    after_plots <- batch_plots_after[[tissue]]
-
-    # Combine donor plots
-    combined_donor_plot <- before_plots$plot_donor + after_plots$plot_donor
-
-    # Combine cell type plots
-    combined_cell_type_plot <- before_plots$plot_cell_type + after_plots$plot_cell_type
-
-    combined_batch_plots[[tissue]] <- list(
-        combined_donor_plot = combined_donor_plot,
-        combined_cell_type_plot = combined_cell_type_plot
-    )
+#### 5. Batch correction with ComBat_seq and save objects ####
+perform_save_batch_correction <- function(obj, tissue) {
+    tryCatch({
+        donors <- obj$donor_id
+        if (length(unique(donors)) > 1) { # Skip tissues with one donor
+            cat(glue("   - Batch correcting {tissue} object"), format(Sys.time()), "\n", file = progress_file, append = TRUE)
+            counts_corr <- sva::ComBat_seq(as.matrix(obj@assays$RNA@counts),
+                batch = donors
+            )
+            obj[["RNA"]]@counts <- counts_corr
+        }
+        saveRDS(obj, glue::glue("output/preprocessing/all/{tissue}_prepped.rds"))
+        cat(glue("   - Saved batch-corrected object for {tissue}"), format(Sys.time()), "\n", file = progress_file, append = TRUE)
+        obj
+    }, error = function(e) {
+        cat(glue("Error processing batch correction for tissue '{tissue}': {e$message}"), format(Sys.time()), "\n", file = progress_file, append = TRUE)
+        NULL
+    })
 }
+
+cat("- Starting batch correction and saving using ComBat_seq -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+objects <- purrr::imap(
+    objects,
+    ~ perform_save_batch_correction(.x, .y)
+)
+cat("- Completed batch correction and saving -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+
+
+#### 7. Create UMAP plots AFTER batch correction ####
+batch_plots_after <- purrr::imap(
+    objects,
+    function(.x, .y) {
+        if (length(unique(.x$donor_id)) > 1) {
+            inspect_batch_effect(.x, .y, stage = "after")
+        } else {
+            NULL
+        }
+    }
+)
+
+batch_plots_before <- purrr::compact(batch_plots_before)
+batch_plots_after <- purrr::compact(batch_plots_after)
+
+#### 8. Save UMAP plots to PDF ####
+
+# Combine before and after batch effect plots for each tissue, handling NULL values
+combined_batch_plots <- purrr::imap(
+    batch_plots_before,
+    function(.x, .y) {
+        list(
+            combined_donor_plot = .x$plot_donor + batch_plots_after[[.y]]$plot_donor,
+            combined_cell_type_plot = .x$plot_cell_type + batch_plots_after[[.y]]$plot_cell_type
+        )
+    }
+)
 
 # Save combined plots to PDF
-pdf("output/preprocessing/plots/all_tissues_batch_effect_umap2.pdf", width = 10, height = 5)
-for (tissue in names(combined_batch_plots)) {
-    print(combined_batch_plots[[tissue]]$combined_donor_plot)
-    print(combined_batch_plots[[tissue]]$combined_cell_type_plot)
-}
+pdf("output/preprocessing/plots/all_tissues_batch_effect_umap.pdf", width = 10, height = 5)
+purrr::iwalk(combined_batch_plots, function(plots, name) {
+    print(plots$combined_donor_plot)
+    print(plots$combined_cell_type_plot)
+})
 dev.off()
 
 
-#### 7. Plot gene expression scatter plot for each tissue ####
+#### 9. Generate gene expression scatter plot ####
 
 # Connect to Ensembl
-ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+# ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
 # Function to retrieve gene biotypes and prepare data for plotting
 get_gene_biotypes <- function(object_filter) {
     gene_totals <- rowSums(object_filter)
@@ -353,7 +260,7 @@ get_gene_biotypes <- function(object_filter) {
 
 # Function to generate gene expression scatter plot for a given tissue
 generate_gene_expression_plot <- function(df, tissue_name) {
-    # Define colors for each group (choose colors as you prefer)
+    # Define colors for each group
     group_colors <- c("ENSG" = "red", "protein_coding" = "blue", "lncRNA" = "green", "other" = "black")
 
     # Plot the gene totals, coloring by the group
@@ -371,31 +278,14 @@ generate_gene_expression_plot <- function(df, tissue_name) {
     return(p)
 }
 
-# Retrieve gene biotypes and save to a named list
-gene_df <- list(
-    blood = get_gene_biotypes(blood_object_filter),
-    lung = get_gene_biotypes(lung_object_filter),
-    fat = get_gene_biotypes(fat_object_filter),
-    kidney = get_gene_biotypes(kidney_object_filter),
-    liver = get_gene_biotypes(liver_object_filter),
-    s_intestine = get_gene_biotypes(s_intestine_object_filter),
-    l_intestine = get_gene_biotypes(l_intestine_object_filter)
-)
+# # Get gene biotypes and generate expression plots for each tissue
+# gene_df <- purrr::imap(objects, ~ get_gene_biotypes(.x))
+# gex_plots <- purrr::imap(gene_df, ~ generate_gene_expression_plot(.x, .y))
 
-# Generate plots for all tissues
-gex_plots <- list(
-    blood = generate_gene_expression_plot(gene_df$blood, "blood"),
-    lung = generate_gene_expression_plot(gene_df$lung, "lung"),
-    fat = generate_gene_expression_plot(gene_df$fat, "fat"),
-    kidney = generate_gene_expression_plot(gene_df$kidney, "kidney"),
-    liver = generate_gene_expression_plot(gene_df$liver, "liver"),
-    s_intestine = generate_gene_expression_plot(gene_df$s_intestine, "s_intestine"),
-    l_intestine = generate_gene_expression_plot(gene_df$l_intestine, "l_intestine")
-)
-
-# Save all expression plots to a single PDF
-pdf("output/preprocessing/plots/all_tissues_raw_exp_scatter.pdf", width = 10, height = 3)
-for (plot in gex_plots) {
-    print(plot)
-}
-dev.off()
+# # Save the gene expression scatter plots to a PDF
+# pdf("output/preprocessing/plots/all_tissues_raw_exp_scatter.pdf",
+#     width = 10,
+#     height = 3
+# )
+# purrr::iwalk(gex_plots, ~ print(.x))
+# dev.off()

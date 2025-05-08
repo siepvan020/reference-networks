@@ -28,18 +28,12 @@ library(SCORPION)
 library(doParallel)
 library(Matrix)
 
-library(yaml)
-library(glue)
-library(purrr)
 
 # Set working directory
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
-# Load config file
-config <- yaml::read_yaml("data/config/config.yaml")
 
-
-#### 2. Define functions ####
+#### 2. Load data ####
 
 # Function to load Seurat objects and set cell type identities
 load_seurat_object <- function(file_path) {
@@ -48,7 +42,28 @@ load_seurat_object <- function(file_path) {
     return(object)
 }
 
-# Function to run SCORPION for a given tissue and cell types
+# Load Seurat objects
+blood_object <- load_seurat_object("output/preprocessing/blood_prepped.rds")
+lung_object <- load_seurat_object("output/preprocessing/lung_prepped.rds")
+fat_object <- load_seurat_object("output/preprocessing/fat_prepped.rds")
+kidney_object <- load_seurat_object("output/preprocessing/kidney_prepped.rds")
+liver_object <- load_seurat_object("output/preprocessing/liver_prepped.rds")
+s_intestine_object <- load_seurat_object("output/preprocessing/s_intestine_prepped.rds")
+l_intestine_object <- load_seurat_object("output/preprocessing/l_intestine_prepped.rds")
+
+cat("- Loaded Seurat objects -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+
+# Read priors
+ppi <- read.delim("data/priors/ppi_prior_2024.tsv", header = FALSE, sep = "\t")
+tf <- read.delim("data/priors/motif_prior_names_2024.tsv", header = FALSE, sep = "\t")
+cat("- Loaded priors -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+
+# Set up parallel processing
+num_cores <- 5
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+
+#### 3. Run SCORPION for each celltype####
 run_scorpion <- function(tissue, object, cell_types, output_file) {
     scorpion_output <- list()
 
@@ -117,39 +132,26 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
     cat("Saved SCORPION output -", output_file, "\n", file = progress_file, append = TRUE)
 }
 
+# Run SCORPION for blood
+run_scorpion("blood", blood_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "platelet"), "output/networks/final/bloodScorpionOutput4.Rdata")
 
-#### 3. Read priors and set up parallel processing ####
+# Run SCORPION for lung
+run_scorpion("lung", lung_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "type_ii_pneumocyte"), "output/networks/final/lungScorpionOutput4.Rdata")
 
-# Read priors
-ppi <- read.delim("data/priors/ppi_prior_2024.tsv", header = FALSE, sep = "\t")
-tf <- read.delim("data/priors/motif_prior_names_2024.tsv", header = FALSE, sep = "\t")
-cat("- Loaded priors -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
+# Run SCORPION for fat
+run_scorpion("fat", fat_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "b_cell", "macrophage", "adipose_stem_cell"), "output/networks/final/fatScorpionOutput4.Rdata")
 
-# Set up parallel processing
-num_cores <- 5
-cl <- makeCluster(num_cores)
-registerDoParallel(cl)
+# Run SCORPION for kidney
+run_scorpion("kidney", kidney_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "kidney_epithelial_cell"), "output/networks/final/kidneyScorpionOutput4.Rdata")
 
+# Run SCORPION for liver
+run_scorpion("liver", liver_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "monocyte", "macrophage", "hepatocyte"), "output/networks/final/liverScorpionOutput4.Rdata")
 
-#### 4. Run SCORPION for each tissue in the config file ####
+# Run SCORPION for small intestine
+run_scorpion("s_intestine", s_intestine_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "paneth_cell"), "output/networks/final/s_intestineScorpionOutput4.Rdata")
 
-process_tissue <- function(spec, tissue) {
-    # ---- 1. Load preprocessed Seurat object ----------
-    obj_path <- glue("output/preprocessing/{tissue}_prepped.rds")
-    obj <- load_seurat_object(obj_path)
-
-    # ---- 2. Cell types to analyze ---------------------
-    celltypes <- names(spec$cells)
-
-    # ---- 3. Output location ---------------------
-    outfile <- glue("output/networks/final/{tissue}ScorpionOutput4.Rdata")
-
-    cat("\n- Starting:", tissue, " -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
-
-    run_scorpion(tissue, obj, celltypes, outfile)
-}
-
-iwalk(config, process_tissue)
+# Run SCORPION for large intestine
+run_scorpion("l_intestine", l_intestine_object, c("cd4_positive_t_cell", "cd8_positive_t_cell", "b_cell", "macrophage", "enterocyte"), "output/networks/final/l_intestineScorpionOutput4.Rdata")
 
 # Stop parallel processing
 stopCluster(cl)

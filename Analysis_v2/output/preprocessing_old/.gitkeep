@@ -1,0 +1,10 @@
+Placeholder file for .rds files, which were too big to commit to this repository
+Containing:
+- blood_celltypes.rds
+- blood_preprocessed_batch.rds
+- blood_preprocessed.rds
+- blood_sce.rds
+- lung_celltypes.rds
+- lung_preprocessed_batch.rds
+- lung_preprocessed.rds
+- lung_sce.rds

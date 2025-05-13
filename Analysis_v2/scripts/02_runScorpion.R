@@ -10,7 +10,7 @@ cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
 # Set CRAN mirror
 options(repos = c(CRAN = "https://cran.r-project.org"))
 
-# Install required packages
+# Install required packages 
 # if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 # if (!requireNamespace("Matrix", quietly = TRUE)) remotes::install_version("Matrix", version = "1.6.4")
 # install.packages("SeuratObject")
@@ -58,7 +58,7 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
         .packages = c("Seurat", "SCORPION", "Matrix"),
         .errorhandling = "pass",
         .verbose = TRUE,
-        .export = c("tf", "ppi", "progress_file", "object")
+        .export = c("tf", "ppi", "progress_file")
     ) %dopar% {
         cat("\n- Starting:", cell_type, " -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
@@ -100,7 +100,7 @@ run_scorpion <- function(tissue, object, cell_types, output_file) {
         save(result, file = temp_file)
 
         # Clear memory
-        rm(cell_subset, gex_cell, scorpion_input)
+        rm(cell_subset, gex_cell, scorpion_input, object)
         gc()
 
         cat("\n- Finished:", cell_type, " -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
@@ -126,7 +126,7 @@ tf <- read.delim("data/priors/motif_prior_names_2024.tsv", header = FALSE, sep =
 cat("- Loaded priors -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 
 # Set up parallel processing
-num_cores <- 4
+num_cores <- 2
 cl <- makeCluster(num_cores)
 registerDoParallel(cl)
 
@@ -142,7 +142,7 @@ process_tissue <- function(spec, tissue) {
     celltypes <- names(spec$cells)
 
     # ---- 3. Output location ---------------------
-    outfile <- glue("output/networks/final/{tissue}ScorpionOutput4.Rdata")
+    outfile <- glue("output/networks/final/{tissue}ScorpionOutput.Rdata")
 
     cat("\n- Starting:", tissue, " -", format(Sys.time()), "\n", file = progress_file, append = TRUE)
 

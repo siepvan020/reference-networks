@@ -6,7 +6,6 @@
 **/*.h5ad
 **/*.h5seurat
 **/*.pdf
-**/*.log
 
 data/TS_All_Tissues.zip
 data/Tabula_Sapiens_metadata.csv

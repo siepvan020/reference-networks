@@ -100,7 +100,7 @@ heart:
   file: TS_v2_Heart.rds
   cells:
     artrial_cardiomyocyte:
-      - regular atrial cardiac myocyt
+      - regular atrial cardiac myocyte
     cardiac_endothelial_cell:
       - cardiac endothelial cell
     cardiac_fibroblast:
@@ -355,7 +355,7 @@ skin:
       - regulatory T cell
     smooth_muscle_cell:
       - smooth muscle cell
-small_intestine:
+s_intestine:
   file: TS_v2_Small_intestine.rds
   cells:
     b_cell:

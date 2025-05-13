@@ -27,13 +27,13 @@ library(biomaRt)
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 #### 1. Load and format data ####
-load("output/networks/final/bloodScorpionOutput4.Rdata")
-load("output/networks/final/lungScorpionOutput4.Rdata")
-load("output/networks/final/fatScorpionOutput4.Rdata")
-load("output/networks/final/kidneyScorpionOutput4.Rdata")
-load("output/networks/final/liverScorpionOutput4.Rdata")
-load("output/networks/final/s_intestineScorpionOutput4.Rdata")
-load("output/networks/final/l_intestineScorpionOutput4.Rdata")
+load("output/networks/final/run4/bloodScorpionOutput4.Rdata")
+load("output/networks/final/run4/lungScorpionOutput4.Rdata")
+load("output/networks/final/run4/fatScorpionOutput4.Rdata")
+load("output/networks/final/run4/kidneyScorpionOutput4.Rdata")
+load("output/networks/final/run4/liverScorpionOutput4.Rdata")
+load("output/networks/final/run4/s_intestineScorpionOutput4.Rdata")
+load("output/networks/final/run4/l_intestineScorpionOutput4.Rdata")
 
 
 #### 2. Calculate indegrees & outdegrees ####
@@ -57,7 +57,7 @@ l_intestine_indegrees <- calculate_indegrees(l_intestine_output, "l_intestine")
 
 # Combine blood and lung indegrees and outdegrees into one dataframe
 combined_indegrees <- Reduce(function(x, y) merge(x, y, by = "gene", all = TRUE), list(blood_indegrees, lung_indegrees, fat_indegrees, kidney_indegrees, liver_indegrees, s_intestine_indegrees, l_intestine_indegrees))
-
+combined_indegrees <- combined_indegrees[, c("gene", sort(colnames(combined_indegrees)[-1]))]
 
 # Generate PCA and UMAP and plot only UMAP on different conditions
 perform_dimensionality_reduction <- function(data, output_prefix, analysis_type, avgdepth = NULL, n_neighbors = 8, min_dist = 0.1) {
@@ -171,23 +171,9 @@ ggsave("output/analysis/correlation/run4_correlation_matrix_indegrees.pdf", cor_
 
 #### 3. Calculate linear regression and residuals between conditions ####
 
-# # Define comparisons
-# comparisons_old <- list(
-#     list(name = "cd4_blood_vs_lung", x = "blood_cd4_positive_t_cell", y = "lung_cd4_positive_t_cell"),
-#     list(name = "cd8_blood_vs_lung", x = "blood_cd8_positive_t_cell", y = "lung_cd8_positive_t_cell"),
-#     list(name = "monocyte_blood_vs_lung", x = "blood_monocyte", y = "lung_monocyte"),
-#     list(name = "lung_cd4_vs_cd8", x = "lung_cd4_positive_t_cell", y = "lung_cd8_positive_t_cell"),
-#     list(name = "lung_cd4_vs_monocyte", x = "lung_cd4_positive_t_cell", y = "lung_monocyte"),
-#     list(name = "lung_cd8_vs_monocyte", x = "lung_cd8_positive_t_cell", y = "lung_monocyte"),
-#     list(name = "blood_platelet_vs_lung_2pneumo", x = "blood_platelet", y = "lung_type_ii_pneumocyte"),
-#     list(name = "blood_monocyte_vs_lung_2pneumo", x = "blood_monocyte", y = "lung_type_ii_pneumocyte")
-# )
-
 # Define comparisons
 comparisons <- list(
-    # list(name = "b_cell_fat_vs_kidney", x = "fat_b_cell", y = "kidney_b_cell"),
     list(name = "cd4_blood_vs_s_intestine", x = "blood_cd4_positive_t_cell", y = "s_intestine_cd4_positive_t_cell"),
-    # list(name = "cd8_l_intestine_vs_liver", x = "l_intestine_cd8_positive_t_cell", y = "liver_cd8_positive_t_cell"),
     list(name = "monocyte_blood_vs_liver", x = "blood_monocyte", y = "liver_monocyte")
 )
 
@@ -261,14 +247,7 @@ for (comp in comparisons) {
 }
 
 # Save plots of the linear regression models
-# ggsave("output/analysis/linear_regression/run3/immune_cells_between_tissues3.pdf", patchwork::wrap_plots(A = plot_list[[1]], B = plot_list[[2]], C = plot_list[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
-# ggsave("output/analysis/linear_regression/run3/immune_cells_lung3.pdf", patchwork::wrap_plots(A = plot_list[[4]], B = plot_list[[5]], C = plot_list[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
-# ggsave("output/analysis/linear_regression/run3/tissue_specific_linear3.pdf", plot_list[[7]], width = 12, height = 6)
-# ggsave("output/analysis/linear_regression/run3/blood_monocyte_vs_lung_2pneumo.pdf", plot_list[[8]], width = 12, height = 6)
-
-# ggsave("output/analysis/linear_regression/run4/b_cell_fat_vs_kidney.pdf", plot_list[[1]], width = 12, height = 6)
 ggsave("output/analysis/linear_regression/run4/cd4_blood_vs_s_intestine.pdf", plot_list[[2]], width = 12, height = 6)
-# ggsave("output/analysis/linear_regression/run4/cd8_l_intestine_vs_liver.pdf", plot_list[[3]], width = 12, height = 6)
 ggsave("output/analysis/linear_regression/run4/monocyte_blood_vs_liver.pdf", plot_list[[4]], width = 12, height = 6)
 
 
@@ -352,7 +331,7 @@ plot_top_pathways <- function(topPathways, comparison_name) {
         scale_size_area(max_size = 10) +
         scale_fill_gradient(low = "white", high = "red") +
         theme(
-            axis.text.y = element_text(size = 14),
+            axis.text.y = element_text(size = 16),
             axis.title.y = element_blank(),
             plot.title = element_text(hjust = 1, face = "bold")
         ) +
@@ -365,7 +344,7 @@ plot_top_pathways <- function(topPathways, comparison_name) {
         scale_size_area(max_size = 10) +
         scale_fill_gradient(low = "blue", high = "white") +
         theme(
-            axis.text.y = element_text(size = 14),
+            axis.text.y = element_text(size = 16),
             axis.title.y = element_blank(),
             plot.title = element_text(hjust = 1, face = "bold")
         ) +
@@ -390,43 +369,11 @@ for (comp in names(gsea_results_indegree)) {
     # Save plots
     updotplot <- gsea_plots[[comp]]$up
     downdotplot <- gsea_plots[[comp]]$down
-    pdf(file = paste0("output/analysis/gsea_dotplots/run4/", iteration, "_", comp, "_dotplot.pdf"), width = 17, height = 15)
+    pdf(file = paste0("output/analysis/gsea_dotplots/run4/", iteration, "_", comp, "_dotplot.pdf"), width = 20, height = 13)
     print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
     dev.off()
     iteration <- iteration + 1
 }
-
-# Check for overlap between leading edge genes and rownames of the regulatory network
-leading_edge_genes <- top_pathways_list$BP_blood_platelet_vs_lung_2pneumo$up[1, ]$leadingEdge[[1]]
-# overlap_genes <- intersect(leading_edge_genes, colnames(lung_output$type_ii_pneumocyte$regNet))
-
-# Extract the columns of the regulatory network that match the overlapping genes
-overlap_columns <- lung_output$type_ii_pneumocyte$regNet[, leading_edge_genes, drop = FALSE]
-
-# Save the top 10 highest values (and corresponding rows) for each column
-top_edges <- apply(overlap_columns, 2, function(col) {
-    sorted_indices <- order(col, decreasing = TRUE)[1:5]
-    data.frame(tf = rownames(overlap_columns)[sorted_indices], edge = col[sorted_indices])
-})
-
-# Count the occurrences of each tf in the top_edges list
-tf_counts <- sort(table(unlist(lapply(top_edges, function(df) df$tf))), decreasing = TRUE)
-top_tfs <- names(tf_counts)[1:7]
-
-lung_subset <- subset(lung_object, idents = c("type_ii_pneumocyte")) # load lung expression object first
-blood_subset <- subset(blood_object, idents = c("platelet")) # load blood expression object first
-
-# Extract the rows from the object and sum up expression
-# overlap_sparse_matrix <- Seurat::AggregateExpression(lung_subset)[[1]][top_tfs, , drop = FALSE]
-as.data.frame(rowSums(lung_subset@assays$RNA@counts[top_tfs, ]))
-summary(rowSums(lung_subset@assays$RNA@counts))
-
-# Print the resulting sparse matrix
-# print(overlap_sparse_matrix)
-
-
-
-
 
 
 #### 5. Run analysis on expression data ####
@@ -468,7 +415,7 @@ avgdepth <- data.frame(celltype_exp = all_depths)
 #
 #
 #
-##### Calculate sum of expression for each gene in each cell type #####
+##### Calculate sum of expression for each gene in each cell type - pseudobulks #####
 calculate_expression_sum <- function(object, tissue) {
     sum_df <- data.frame(gene = rownames(object[["RNA"]]@counts))
     for (ct in levels(Idents(object))) {
@@ -496,8 +443,10 @@ combined_exp_matrix <- Reduce(
         s_intestine_sum_exp, l_intestine_sum_exp
     )
 )
+combined_exp_matrix <- combined_exp_matrix[, c("gene", sort(colnames(combined_exp_matrix)[-1]))]
 
 cor_exp_matrix <- cor(combined_exp_matrix[, -1], use = "pairwise.complete.obs")
+
 
 cor_exp_long <- as.data.frame(as.table(cor_exp_matrix))
 difference_long <- as.data.frame(as.table(cor_indegree_matrix - cor_exp_matrix))
@@ -506,17 +455,6 @@ cor_exp_plot <- plot_correlation_matrix(cor_exp_long, title = "Correlation Matri
 ggsave("output/analysis/correlation/correlation_matrix_expression.pdf", cor_exp_plot, width = 12, height = 6)
 cor_dif_plot <- plot_correlation_matrix(difference_long, title = "Difference in Correlation Matrix of Indegrees and Expression", gradient_limits = c(min(difference_long$Freq), 1))
 ggsave("output/analysis/correlation/correlation_matrices_difference.pdf", cor_dif_plot, width = 12, height = 6)
-
-# Add the predefined comparisons indegrees into a dataframe and make correlation matrix
-comp_indegrees <- combined_indegrees[, c("gene", unique(unlist(lapply(comparisons, function(comp) c(comp$x, comp$y))))), drop = FALSE]
-cor_indegree_comp_matrix <- cor(comp_indegrees[, -1], use = "pairwise.complete.obs")
-cor_indegree_comps_long <- as.data.frame(as.table(cor_indegree_comp_matrix))
-
-cor_indegree_comps_plot <- plot_correlation_matrix(cor_indegree_comps_long,
-    title = "Correlation Matrix of Indegrees of Selected Comparisons",
-    labels = TRUE
-)
-ggsave("output/analysis/correlation/run4_correlation_matrix_comps_indegrees.pdf", cor_indegree_comps_plot, width = 12, height = 6)
 
 
 ##### Calculate residuals for each comparison #####
@@ -533,16 +471,8 @@ for (comp in comparisons) {
 }
 
 # Save plots of the linear regression models
-# ggsave("output/analysis/linear_regression/gex/immune_cells_between_tissues.pdf", patchwork::wrap_plots(A = gex_plot[[1]], B = gex_plot[[2]], C = gex_plot[[3]], design = "AABB\n#CC#"), width = 12, height = 6)
-# ggsave("output/analysis/linear_regression/gex/immune_cells_lung.pdf", patchwork::wrap_plots(A = gex_plot[[4]], B = gex_plot[[5]], C = gex_plot[[6]], design = "AABB\n#CC#"), width = 12, height = 6)
-# ggsave("output/analysis/linear_regression/gex/tissue_specific_linear.pdf", gex_plot[[7]], width = 12, height = 6)
-# ggsave("output/analysis/linear_regression/gex/blood_monocyte_vs_lung_2pneumo.pdf", gex_plot[[8]], width = 12, height = 6)
-
-ggsave("output/analysis/linear_regression/gex/b_cell_fat_vs_kidney.pdf", gex_plot[[1]], width = 12, height = 6)
-ggsave("output/analysis/linear_regression/gex/cd4_blood_vs_s_intestine.pdf", gex_plot[[2]], width = 12, height = 6)
-ggsave("output/analysis/linear_regression/gex/cd8_l_intestine_vs_liver.pdf", gex_plot[[3]], width = 12, height = 6)
-ggsave("output/analysis/linear_regression/gex/monocyte_blood_vs_liver.pdf", gex_plot[[4]], width = 12, height = 6)
-
+ggsave("output/analysis/linear_regression/gex/cd4_blood_vs_s_intestine.pdf", gex_plot[[1]], width = 12, height = 6)
+ggsave("output/analysis/linear_regression/gex/monocyte_blood_vs_liver.pdf", gex_plot[[2]], width = 12, height = 6)
 
 # Run GSEA on the expression data
 gsea_results_gex <- run_gsea(gex_residuals)

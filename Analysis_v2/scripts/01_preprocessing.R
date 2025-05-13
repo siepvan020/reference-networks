@@ -26,7 +26,7 @@ library(purrr)
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 # Load config file
-config <- yaml::read_yaml("data/config/config_full.yaml")
+config <- yaml::read_yaml("data/config/config.yaml")
 
 
 #### 2. Load data & filter cells ####

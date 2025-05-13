@@ -27,13 +27,13 @@ library(biomaRt)
 setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
 
 #### 1. Load and format data ####
-load("output/networks/final/run4/bloodScorpionOutput4.Rdata")
-load("output/networks/final/run4/lungScorpionOutput4.Rdata")
-load("output/networks/final/run4/fatScorpionOutput4.Rdata")
-load("output/networks/final/run4/kidneyScorpionOutput4.Rdata")
-load("output/networks/final/run4/liverScorpionOutput4.Rdata")
-load("output/networks/final/run4/s_intestineScorpionOutput4.Rdata")
-load("output/networks/final/run4/l_intestineScorpionOutput4.Rdata")
+load("output/networks/final/bloodScorpionOutput.Rdata")
+load("output/networks/final/lungScorpionOutput.Rdata")
+load("output/networks/final/fatScorpionOutput.Rdata")
+load("output/networks/final/kidneyScorpionOutput.Rdata")
+load("output/networks/final/liverScorpionOutput.Rdata")
+load("output/networks/final/s_intestineScorpionOutput.Rdata")
+load("output/networks/final/l_intestineScorpionOutput.Rdata")
 
 
 #### 2. Calculate indegrees & outdegrees ####
@@ -166,7 +166,7 @@ plot_correlation_matrix <- function(data, title = "Correlation Matrix", gradient
 cor_indegree_plot <- plot_correlation_matrix(cor_indegree_long,
     title = "Correlation Matrix of Indegrees"
 )
-ggsave("output/analysis/correlation/run4_correlation_matrix_indegrees.pdf", cor_indegree_plot, width = 12, height = 6)
+ggsave("output/analysis/correlation/correlation_matrix_indegrees.pdf", cor_indegree_plot, width = 12, height = 6)
 
 
 #### 3. Calculate linear regression and residuals between conditions ####
@@ -176,17 +176,6 @@ comparisons <- list(
     list(name = "cd4_blood_vs_s_intestine", x = "blood_cd4_positive_t_cell", y = "s_intestine_cd4_positive_t_cell"),
     list(name = "monocyte_blood_vs_liver", x = "blood_monocyte", y = "liver_monocyte")
 )
-
-# Add the predefined comparisons indegrees into a dataframe and make correlation matrix
-comp_indegrees <- combined_indegrees[, c("gene", unique(unlist(lapply(comparisons, function(comp) c(comp$x, comp$y))))), drop = FALSE]
-cor_indegree_comp_matrix <- cor(comp_indegrees[, -1], use = "pairwise.complete.obs")
-cor_indegree_comps_long <- as.data.frame(as.table(cor_indegree_comp_matrix))
-
-cor_indegree_comps_plot <- plot_correlation_matrix(cor_indegree_comps_long,
-    title = "Correlation Matrix of Indegrees of Selected Comparisons",
-    labels = TRUE
-)
-ggsave("output/analysis/correlation/run4_correlation_matrix_comps_indegrees.pdf", cor_indegree_comps_plot, width = 12, height = 6)
 
 # Function to fit linear model and extract + rank residuals descending
 calculate_residuals <- function(data, x_con, y_con) {
@@ -247,8 +236,8 @@ for (comp in comparisons) {
 }
 
 # Save plots of the linear regression models
-ggsave("output/analysis/linear_regression/run4/cd4_blood_vs_s_intestine.pdf", plot_list[[2]], width = 12, height = 6)
-ggsave("output/analysis/linear_regression/run4/monocyte_blood_vs_liver.pdf", plot_list[[4]], width = 12, height = 6)
+ggsave("output/analysis/linear_regression/indegree/cd4_blood_vs_s_intestine.pdf", plot_list[[2]], width = 12, height = 6)
+ggsave("output/analysis/linear_regression/indegree/monocyte_blood_vs_liver.pdf", plot_list[[4]], width = 12, height = 6)
 
 
 
@@ -369,7 +358,7 @@ for (comp in names(gsea_results_indegree)) {
     # Save plots
     updotplot <- gsea_plots[[comp]]$up
     downdotplot <- gsea_plots[[comp]]$down
-    pdf(file = paste0("output/analysis/gsea_dotplots/run4/", iteration, "_", comp, "_dotplot.pdf"), width = 20, height = 13)
+    pdf(file = paste0("output/analysis/gsea_dotplots/indegree/", iteration, "_", comp, "_dotplot.pdf"), width = 20, height = 13)
     print(patchwork::wrap_plots(updotplot, downdotplot, ncol = 1))
     dev.off()
     iteration <- iteration + 1

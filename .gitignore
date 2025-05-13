@@ -1,17 +1,7 @@
-/Test
-/TS_v2_dataload
-
 **/*.rds
 **/*.Rdata
-**/*.h5ad
-**/*.h5seurat
 **/*.pdf
-
-data/TS_All_Tissues.zip
-data/Tabula_Sapiens_metadata.csv
-
-Analysis/data/priors/*.tsv
+**/*.log
 
 Analysis_v2/data/priors/motif_prior_names_2024.tsv
 
-Analysis_v2/scripts/sva_preprocessing.R

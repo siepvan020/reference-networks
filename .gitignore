@@ -3,5 +3,5 @@
 **/*.pdf
 **/*.log
 
-Analysis_v2/data/priors/motif_prior_names_2024.tsv
+Pipeline/data/priors/motif_prior_names_2024.tsv
 

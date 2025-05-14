@@ -81,7 +81,7 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
 
     # Perform UMAP
     set.seed(42)
-    umap_res            <- umap(umap_input, n_neighbors = n_neighbors, min_dist = min_dist)
+    umap_res            <- uwot::umap(umap_input, n_neighbors = n_neighbors, min_dist = min_dist)
     umap_df             <- as.data.frame(umap_res)
     colnames(umap_df)   <- c("UMAP1", "UMAP2")
     umap_df$condition   <- rownames(umap_df)

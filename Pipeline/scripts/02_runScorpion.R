@@ -2,7 +2,7 @@
 
 #### 1. Setup ####
 
-progress_file <- "/div/pythagoras/u1/siepv/siep/Analysis_v2/output/log/networks.log"
+progress_file <- "/div/pythagoras/u1/siepv/siep/Pipeline/output/log/networks.log"
 
 # Start fresh log or append
 cat("Starting script at", format(Sys.time()), "\n", file = progress_file)
@@ -33,7 +33,7 @@ library(glue)
 library(purrr)
 
 # Set working directory
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
+setwd("/div/pythagoras/u1/siepv/siep/Pipeline")
 
 # Load config file
 config <- yaml::read_yaml("data/config/config.yaml")

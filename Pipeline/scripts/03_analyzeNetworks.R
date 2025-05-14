@@ -24,7 +24,7 @@ library(tidyr)
 library(biomaRt)
 
 # Set working directory
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
+setwd("/div/pythagoras/u1/siepv/siep/Pipeline")
 
 #### 1. Load and format data ####
 load("output/networks/final/bloodScorpionOutput.Rdata")

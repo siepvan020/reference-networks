@@ -24,7 +24,7 @@ library(tidyr)
 library(biomaRt)
 
 # Set working directory
-setwd("/div/pythagoras/u1/siepv/siep/Analysis_v2")
+setwd("/div/pythagoras/u1/siepv/siep/Pipeline")
 
 #### 1. Load and format data ####
 load("output/networks/final/bloodScorpionOutput.Rdata")
@@ -81,7 +81,7 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
 
     # Perform UMAP
     set.seed(42)
-    umap_res            <- umap(umap_input, n_neighbors = n_neighbors, min_dist = min_dist)
+    umap_res            <- uwot::umap(umap_input, n_neighbors = n_neighbors, min_dist = min_dist)
     umap_df             <- as.data.frame(umap_res)
     colnames(umap_df)   <- c("UMAP1", "UMAP2")
     umap_df$condition   <- rownames(umap_df)
@@ -130,13 +130,13 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
         save_umap("counts", use_gradient = TRUE)
     }
 
-    return(list(pca = pca_df, umap = umap_df, mat = mat, pca_res = pca_res))
 }
 
-indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees") # Only plot UMAP colored and shaped by celltype and tissue
+perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees") # Only plot UMAP colored and shaped by celltype and tissue
+perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", avgdepth) # run this after avgdepth is calculated
 
-indegree_reducs_cnts <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", avgdepth) # run this after the expression data is calculated
-exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", avgdepth) # run this after the expression data is calculated
+perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression") # run this after combined_exp_matrix is calculated
+perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", avgdepth) # run this after combined_exp_matrix and avgdepth are calculated
 
 # Calculate correlation matrix
 cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.obs")

@@ -130,13 +130,13 @@ perform_dimensionality_reduction <- function(data, output_prefix, analysis_type,
         save_umap("counts", use_gradient = TRUE)
     }
 
-    return(list(pca = pca_df, umap = umap_df, mat = mat, pca_res = pca_res))
 }
 
-indegree_reducs <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees") # Only plot UMAP colored and shaped by celltype and tissue
+perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees") # Only plot UMAP colored and shaped by celltype and tissue
+perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", avgdepth) # run this after avgdepth is calculated
 
-indegree_reducs_cnts <- perform_dimensionality_reduction(combined_indegrees, "indegree", "Indegrees", avgdepth) # run this after the expression data is calculated
-exp_reducs <- perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", avgdepth) # run this after the expression data is calculated
+perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression") # run this after combined_exp_matrix is calculated
+perform_dimensionality_reduction(combined_exp_matrix, "expression", "Expression", avgdepth) # run this after combined_exp_matrix and avgdepth are calculated
 
 # Calculate correlation matrix
 cor_indegree_matrix <- cor(combined_indegrees[, -1], use = "pairwise.complete.obs")

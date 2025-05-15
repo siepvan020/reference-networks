@@ -75,9 +75,9 @@ cat("- Loaded and cell-filtered Seurat objects -", format(Sys.time()), "\n", fil
 #### 3. Filter genes ####
 # Function to update gene names and filter the expression matrix
 update_gene_names_and_filter <- function(object, keep_genes, features) {
-    non_mt <- !object@assays$RNA@meta.features$mt # To get correct sum of expression PLOT, comment out this line
-    non_ensg <- !grepl("^ENSG", features$gene_name) # To get correct sum of expression PLOT, comment out this line
-    keep_vec <- keep_genes & non_mt & non_ensg # To get correct sum of expression PLOT, comment out this line
+    non_mt <- !object@assays$RNA@meta.features$mt # To get correct sum of expression PLOT, comment out this line and uncomment everything from section 9
+    non_ensg <- !grepl("^ENSG", features$gene_name) # To get correct sum of expression PLOT, comment out this line and uncomment everything from section 9
+    keep_vec <- keep_genes & non_mt & non_ensg # To get correct sum of expression PLOT, comment out this line and uncomment everything from section 9
 
     obj_filt <- object[keep_vec, ]
     assay <- obj_filt@assays$RNA

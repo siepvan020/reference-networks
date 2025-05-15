@@ -2,5 +2,4 @@
 **/*.Rdata
 **/*.pdf
 **/*.log
-
-Pipeline/data/priors/*.tsv
+**/*.tsv

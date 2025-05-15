@@ -60,7 +60,7 @@ The Seurat objects acquired from Tabula Sapiens contain mistakes and unwanted ce
     {corrected_celltype}:        # Final orrected celltype annotation - lowercase and no whitespaces!!!
       - Cell Type 1A             # Incorrect/redundant celltype annotation to be corrected
       - Cell type 1B             # Incorrect/redundant celltype annotation to be corrected
-    celltype:                    # Celltype that does not need annotation correction
+    {celltype}:                  # Celltype that does not need annotation correction
 ```
 
 
